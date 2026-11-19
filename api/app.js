@@ -67,8 +67,8 @@ const need = (me, roles) => { if (!me) bad('Hãy đăng nhập lại.', 401); if
 const essaysOut = es => (Array.isArray(es) ? es : []).map(e => ({ at: e.at, de: e.de, text: e.text, stars: e.stars, comment: e.comment || '', commentBy: e.commentBy || '', commentAt: e.commentAt || null }));
 // ---------- xu và quà
 const DEFAULT_GIFTS = [
-  { m: 1000, name: "Quà nhỏ: bộ sticker hoặc bút màu" }, { m: 2000, name: "Một cuốn truyện" },
-  { m: 5000, name: "Đi chơi cuối tuần" }, { m: 10000, name: "Quà đặc biệt do bố mẹ chọn" }];
+  { m: 1000, name: "1 bộ sticker" }, { m: 2000, name: "30 phút chơi game" },
+  { m: 5000, name: "1 cặp vé xem phim" }, { m: 10000, name: "1 bộ lego" }];
 const giftsOf = x => (Array.isArray(x && x.gifts) && x.gifts.length ? x.gifts : DEFAULT_GIFTS);
 const vnDay = (ms = Date.now()) => new Date(ms + 7 * 3600000).toISOString().slice(0, 10);
 function dayStreak(days, today) { const set = new Set(days); let n = 0, d = Date.parse(today + "T00:00:00Z"); while (set.has(new Date(d).toISOString().slice(0, 10))) { n++; d -= DAY; } return n; }
