@@ -45,37 +45,54 @@ const STAR='<path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.
 function stars(n,big){let h=`<span class="stars${big?' big':''}" role="img" aria-label="${n} trên 3 sao">`;for(let i=0;i<3;i++)h+=`<svg viewBox="0 0 24 24" class="${i<n?'on':''}" aria-hidden="true">${STAR}</svg>`;return h+'</span>'}
 const starsFrom=(c,n)=>c===n?3:c>=Math.ceil(n*.75)?2:c>=1?1:0;
 
-/* ---------- Lưu sao: trên máy + lên mạng theo mã học sinh ---------- */
+/* ---------- Tài khoản và lưu sao (dùng chung tài khoản với app tiếng Anh) ---------- */
 const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
-let code=LS.get('dcv-code','')||'';
-let best=LS.get('dcv-best-'+code,{})||{};
-let essays=[];let sync='';
-async function api(method,body){
-  const url=method==='GET'?'api/progress?code='+encodeURIComponent(code):'api/progress';
-  const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
-  if(!r.ok)throw new Error(String(r.status));return r.json();
+let me=null;   /* {role:'student'|'teacher'|'parent'|'admin', ...}; null = chơi thử, không đăng nhập */
+let net='';    /* 'ok' có máy chủ, 'off' không kết nối được */
+let best=LS.get('dcv-best-guest',{})||{};
+let essays=[];
+const isStudent=()=>!!me&&me.role==='student';
+const isStaff=()=>!!me&&['teacher','admin','parent'].includes(me.role);
+const ROLE_VI={student:'Học sinh',teacher:'Thầy cô',parent:'Phụ huynh',admin:'Admin'};
+async function call(a,body,q){
+  const r=await fetch('api/app?a='+a+(q||''),{method:body?'POST':'GET',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,credentials:'same-origin'});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){const e=new Error(d.error||'Không kết nối được máy chủ.');e.status=r.status;throw e}
+  return d;
 }
-async function loadServer(){
-  if(!code){sync='';return}
-  try{const d=await api('GET');const b=d.best||{};for(const k in b)if(!(best[k]>=b[k]))best[k]=b[k];essays=d.essays||[];sync='ok';LS.set('dcv-best-'+code,best)}
-  catch(e){sync='off'}
-  renderTotal();if(!G)renderMap();else if(G.g.id==='thi-thu')renderEssays();
+async function boot(){
+  try{const m=await call('me');me=m.role?m:null;net='ok'}catch(e){me=null;net='off'}
+  if(isStudent())await loadMine();else best=me?{}:(LS.get('dcv-best-guest',{})||{});
+  renderTotal();route();
+}
+async function loadMine(){
+  best=LS.get('dcv-best-'+me.code,{})||{};
+  try{const d=await call('progress');for(const k in d.best)if(!(best[k]>=d.best[k]))best[k]=d.best[k];essays=d.essays||[];LS.set('dcv-best-'+me.code,best)}catch(e){}
 }
 function saveBest(id,s,essay){
-  if(!(best[id]>=s))best[id]=s;LS.set('dcv-best-'+code,best);renderTotal();
-  if(code)api('POST',{code,game:id,stars:s,essay}).then(d=>{essays=d.essays||essays;sync='ok';if(G&&G.g.id==='thi-thu')renderEssays()}).catch(()=>{sync='off'});
+  if(isStaff())return;   /* thầy cô, phụ huynh chơi thử: không lưu */
+  if(!(best[id]>=s))best[id]=s;LS.set(isStudent()?'dcv-best-'+me.code:'dcv-best-guest',best);renderTotal();
+  if(isStudent())call('save',{game:id,stars:s,essay}).then(d=>{essays=d.essays||essays;if(G&&G.g.id==='thi-thu')renderEssays()}).catch(()=>{});
 }
-function setCode(c){code=c;LS.set('dcv-code',c);best=LS.get('dcv-best-'+c,{})||{};essays=[];sync='';renderTotal();renderMap();loadServer()}
-function renderTotal(){const t=GAMES.reduce((a,g)=>a+(best[g.id]||0),0);document.getElementById('total').innerHTML=`${code?`<span class="who">Mã ${esc(code)}</span>`:''}<svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg>${t} / ${GAMES.length*3} sao`}
+async function logout(){try{await call('logout',{})}catch(e){}me=null;essays=[];DASH=null;best=LS.get('dcv-best-guest',{})||{};renderTotal();if(location.hash)location.hash='';else renderMap()}
+function renderTotal(){
+  const t=GAMES.reduce((a,g)=>a+(best[g.id]||0),0);
+  document.getElementById('total').innerHTML=(me?`<span class="who">${esc(isStudent()?me.name+' · '+me.code:me.name)}</span>`:'')+
+    (isStaff()?`<a class="who-link" href="#theo-doi">${me.role==='parent'?'Báo cáo của con':'Bảng theo dõi'}</a>`:`<svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg>${t} / ${GAMES.length*3} sao`);
+}
 
 let G=null;
 
 /* ---------- Bản đồ ---------- */
 function acct(){
-  if(code)return `<div class="acct"><span>Đang lưu sao cho mã <b>${esc(code)}</b>.</span><span class="fine">${sync==='ok'?'Đã đồng bộ lên mạng.':sync==='off'?'Chưa kết nối được máy chủ, sao vẫn lưu trên máy này.':'Đang tải…'}</span><button class="ghost sm" data-act="chgcode">Đổi mã</button></div>`;
-  return `<form class="acct" data-form="code"><label for="codein">Nhập mã học sinh để lưu sao lên mạng. Thầy cô và bố mẹ xem kết quả bằng chính mã này.</label>
-    <div class="row"><input id="codein" maxlength="20" placeholder="AN0307" autocomplete="off"><button class="primary" type="submit">Lưu mã</button></div>
-    <span class="fine" id="codeerr">Mã gồm 3–20 chữ cái hoặc chữ số, ví dụ tên và ngày sinh: AN0307. Không nhập mã thì sao chỉ lưu trên máy này.</span></form>`;
+  if(isStudent())return `<div class="acct"><span>Xin chào <b>${esc(me.name)}</b> (mã ${esc(me.code)}). Sao và bài thi thử của em được lưu lên mạng.</span><button class="ghost sm" data-act="logout">Đăng xuất</button></div>`;
+  if(isStaff())return `<div class="acct"><span>Đang đăng nhập: <b>${esc(me.name)}</b> · ${ROLE_VI[me.role]}.</span><span class="fine">Chơi thử ở đây không lưu sao.</span><a class="primary sm" href="#theo-doi">${me.role==='parent'?'Xem báo cáo của con':'Bảng theo dõi'}</a><button class="ghost sm" data-act="logout">Đăng xuất</button></div>`;
+  return `<div class="doors">
+    <form class="acct door" data-form="student"><b>Em là học sinh</b><span class="fine">Nhập mã thầy cô đã cho, đúng mã em dùng ở app tiếng Anh.</span>
+      <div class="row"><input id="codein" maxlength="20" placeholder="AN0307" autocomplete="off" aria-label="Mã học sinh"><button class="primary" type="submit">Vào chơi</button></div><span class="fine err" id="err-s"></span></form>
+    <form class="acct door" data-form="staff"><b>Thầy cô · Bố mẹ · Admin</b><span class="fine">Đăng nhập bằng tài khoản của app tiếng Anh.</span>
+      <div class="row"><input id="login" class="plain-in" placeholder="Tên đăng nhập" autocomplete="username" aria-label="Tên đăng nhập"><input id="pw" class="plain-in" type="password" placeholder="Mật khẩu" autocomplete="current-password" aria-label="Mật khẩu"><button class="primary" type="submit">Đăng nhập</button></div><span class="fine err" id="err-t"></span></form>
+  </div><p class="fine guest">${net==='off'?'Chưa kết nối được máy chủ. ':''}Chưa đăng nhập vẫn chơi thử được, nhưng sao chỉ lưu trên máy này.</p>`;
 }
 function renderMap(){
   G=null;
@@ -407,19 +424,111 @@ function updateThi(){
 function submitThi(){
   if(G.text.trim().length<20){document.getElementById('result').innerHTML='<div class="msg weak"><b>Khoan đã.</b><span>Bé viết thêm rồi hãy nộp bài nhé.</span></div>';return}
   const a=updateThi(),cs=checks(a),met=cs.filter(c=>c.ok).length,n=cs.length,st=met===n?3:met===n-1?2:met>=1?1:0;
-  saveBest('thi-thu',st,code?{de:G.de.de,text:G.text}:undefined);
-  document.getElementById('result').innerHTML=`<div class="msg ${st===3?'ok':'weak'}"><b>${stars(st)}</b><span>${st===3?'Bài làm đạt đủ yêu cầu của đề. Giỏi lắm!':`Bài làm đạt ${met}/${n} yêu cầu. Xem bảng kiểm tra để sửa và nộp lại nhé.`}${code?' Bài đã được lưu.':''}</span></div>`;
+  saveBest('thi-thu',st,isStudent()?{de:G.de.de,text:G.text}:undefined);
+  document.getElementById('result').innerHTML=`<div class="msg ${st===3?'ok':'weak'}"><b>${stars(st)}</b><span>${st===3?'Bài làm đạt đủ yêu cầu của đề. Giỏi lắm!':`Bài làm đạt ${met}/${n} yêu cầu. Xem bảng kiểm tra để sửa và nộp lại nhé.`}${isStudent()?' Bài đã được lưu, thầy cô sẽ đọc và nhận xét.':isStaff()?' (Chơi thử: bài không được lưu.)':''}</span></div>`;
 }
 function renderEssays(){
   const el=document.getElementById('essays');if(!el)return;
-  if(!code){el.innerHTML='';return}
-  el.innerHTML=essays.length?`<div class="panel"><h3>Bài đã nộp của mã ${esc(code)} (${essays.length})</h3>${essays.map(e=>`<details class="essay"><summary>${stars(e.stars||0)} <span>${esc(new Date(e.at).toLocaleDateString('vi-VN'))} · ${esc(e.de)}</span></summary><p>${esc(e.text)}</p></details>`).join('')}</div>`:'';
+  if(!isStudent()){el.innerHTML='';return}
+  el.innerHTML=essays.length?`<div class="panel"><h3>Bài đã nộp (${essays.length})</h3>${essays.map(e=>`<details class="essay"${e.comment?' open':''}><summary>${stars(e.stars||0)} <span>${esc(new Date(e.at).toLocaleDateString('vi-VN'))} · ${esc(e.de)}</span>${e.comment?'<span class="badge soft">có nhận xét</span>':''}</summary><p>${esc(e.text)}</p>${e.comment?`<div class="msg info"><b>${esc(e.commentBy||'Thầy cô')}:</b><span>${esc(e.comment)}</span></div>`:''}</details>`).join('')}</div>`:'';
+}
+
+/* ---------- Bảng theo dõi: thầy cô, Admin, phụ huynh ---------- */
+let DASH=null,TAB='hs';
+const ENG_APP='https://english-exam-web-roan.vercel.app';
+const islPct=b=>ISLANDS.map((_,k)=>{const gs=GAMES.filter(g=>g.is===k);return {k,got:gs.reduce((a,g)=>a+((b||{})[g.id]||0),0),max:gs.length*3}});
+const fmtDate=s=>s?new Date(s).toLocaleDateString('vi-VN'):'chưa chơi';
+const shortIsl=k=>ISLANDS[k].name.replace('Đảo ','');
+async function renderDash(h){
+  G=null;
+  if(!isStaff()){$app.innerHTML=`<div class="board"><p>Trang này dành cho thầy cô, phụ huynh và Admin. Hãy đăng nhập ở trang chủ.</p><div class="actions"><a class="primary" href="#">Về trang chủ</a></div></div>`;return}
+  if(!DASH){$app.innerHTML='<p class="fine">Đang tải bảng theo dõi…</p>';try{DASH=await call('dash')}catch(e){$app.innerHTML=`<div class="board"><p>${esc(e.message)}</p></div>`;return}}
+  const S=DASH.students;
+  if(h.startsWith('hs-')){const st=S.find(s=>s.code===h.slice(3));if(st)return renderKid(st,{back:me.role!=='parent'||S.length>1,canComment:me.role!=='parent'});h='theo-doi'}
+  if(me.role==='parent'){if(S.length===1)return renderKid(S[0],{back:false,canComment:false});return listParent(S)}
+  const wait=S.reduce((a,s)=>a+s.essays.filter(e=>!e.comment).length,0);
+  const tabs=[['hs','Học sinh'],['bai',`Bài viết chờ nhận xét${wait?` <span class="badge">${wait}</span>`:''}`]].concat(me.role==='admin'?[['ql','Quản lý']]:[]);
+  if(TAB==='ql'&&me.role!=='admin')TAB='hs';
+  const body=TAB==='hs'?tableStudents(S):TAB==='bai'?essayFeed(S):adminPanel(S);
+  $app.innerHTML=`<div class="dhead"><h1>Bảng theo dõi</h1><span class="fine">${esc(me.name)} · ${ROLE_VI[me.role]}</span><button class="ghost sm" data-act="d-refresh">Tải lại</button></div>
+    <div class="tabs" role="tablist">${tabs.map(([k,t])=>`<button class="tab${TAB===k?' on':''}" role="tab" aria-selected="${TAB===k}" data-act="d-tab" data-k="${k}">${t}</button>`).join('')}</div>${body}`;
+}
+function tableStudents(S){
+  const act=S.filter(s=>s.active);
+  if(!act.length)return `<div class="board"><p>Chưa có học sinh nào. Thêm học sinh trong <a href="${ENG_APP}" target="_blank" rel="noopener">app tiếng Anh</a>, mã sẽ tự có ở đây.</p></div>`;
+  return `<div class="tablewrap"><table class="dt"><thead><tr><th>Học sinh</th>${ISLANDS.map((x,k)=>`<th class="c${k}"><span class="isle-dot"></span>${shortIsl(k)}</th>`).join('')}<th>Sao</th><th>Chơi gần nhất</th></tr></thead><tbody>
+    ${act.map(s=>{const p=islPct(s.best),t=p.reduce((a,x)=>a+x.got,0),w=s.essays.filter(e=>!e.comment).length;
+      return `<tr class="link" data-act="d-open" data-code="${esc(s.code)}" tabindex="0"><td><b>${esc(s.name)}</b>${w?` <span class="badge" title="Bài chờ nhận xét">${w}</span>`:''}<br><span class="fine">${esc(s.code)}</span></td>${p.map(x=>`<td class="c${x.k}"><div class="pbar"><i style="width:${Math.round(x.got/x.max*100)}%"></i></div><span class="fine">${x.got}/${x.max}</span></td>`).join('')}<td><b>${t}</b>/45</td><td>${fmtDate(s.updated)}</td></tr>`}).join('')}
+    </tbody></table></div><p class="fine">Bấm vào một học sinh để xem 15 trò chơi và các bài thi thử.</p>`;
+}
+function essayFeed(S){
+  const all=[];S.forEach(s=>s.essays.forEach(e=>all.push({s,e})));
+  all.sort((x,y)=>(!!x.e.comment-!!y.e.comment)||(x.e.at<y.e.at?1:-1));
+  if(!all.length)return '<div class="board"><p>Chưa có bài thi thử nào được nộp.</p></div>';
+  return all.map(({s,e})=>essayCard(s,e,true)).join('');
+}
+function essayCard(s,e,canComment){
+  return `<div class="board ecard"><div class="ehead"><b>${esc(s.name)}</b><span class="fine">${esc(s.code)} · ${fmtDate(e.at)}</span>${stars(e.stars||0)}${e.comment?'':'<span class="badge soft">chờ nhận xét</span>'}</div>
+    <p class="de-t">${esc(e.de)}</p><p class="etext">${esc(e.text)}</p>
+    ${canComment?`<form class="cform" data-form="comment" data-code="${esc(s.code)}" data-at="${esc(e.at)}"><textarea rows="2" aria-label="Nhận xét" placeholder="Nhận xét cho bài viết, ví dụ: Bài có hình ảnh so sánh đẹp, cần thêm câu kết nêu cảm xúc.">${esc(e.comment)}</textarea>
+      <div class="actions"><button class="primary sm" type="submit">${e.comment?'Sửa nhận xét':'Gửi nhận xét'}</button>${me&&me.role==='admin'?`<button class="ghost sm" type="button" data-act="d-delessay" data-code="${esc(s.code)}" data-at="${esc(e.at)}">Xóa bài</button>`:''}<span class="fine saved" role="status"></span></div></form>`
+    :(e.comment?`<div class="msg info"><b>${esc(e.commentBy||'Thầy cô')}:</b><span>${esc(e.comment)}</span></div>`:'<p class="fine">Thầy cô chưa nhận xét bài này.</p>')}</div>`;
+}
+function adminPanel(S){
+  return `<div class="board"><p>Thêm, khóa hay xóa học sinh, tài khoản thầy cô và phụ huynh: làm trong <a href="${ENG_APP}" target="_blank" rel="noopener">app tiếng Anh</a>. Thay đổi bên đó có hiệu lực ngay ở đây.</p>
+    <div class="tablewrap"><table class="dt"><thead><tr><th>Học sinh</th><th>Link riêng cho phụ huynh</th><th>Dữ liệu trò chơi</th></tr></thead><tbody>
+    ${S.map(s=>`<tr><td><b>${esc(s.name)}</b><br><span class="fine">${esc(s.code)}${s.active?'':' · đang khóa'}</span></td>
+      <td>${s.plink?`<button class="ghost sm" data-act="d-copy" data-link="${esc(location.origin+location.pathname+'?p='+s.plink)}">Sao chép link</button>`:'<span class="fine">Chưa có. Tạo link phụ huynh trong app tiếng Anh.</span>'}</td>
+      <td><button class="ghost sm" data-act="d-reset" data-code="${esc(s.code)}">Xóa tiến độ</button></td></tr>`).join('')}</tbody></table></div>
+    <p class="fine">Link riêng dùng chung mã bí mật với link phụ huynh của app tiếng Anh: tắt hoặc đổi link bên đó thì link ở đây cũng đổi theo.</p></div>`;
+}
+function listParent(S){
+  $app.innerHTML=`<div class="dhead"><h1>Báo cáo của các con</h1><span class="fine">${esc(me.name)} · Phụ huynh</span></div>
+    <div class="islands">${S.map(s=>{const t=islPct(s.best).reduce((a,x)=>a+x.got,0);return `<a class="island" href="#hs-${esc(s.code)}"><h3>${esc(s.name)}</h3><p>Mã ${esc(s.code)} · ${t}/45 sao · chơi gần nhất: ${fmtDate(s.updated)}</p></a>`}).join('')||'<p>Chưa có con nào được gắn với tài khoản này.</p>'}</div>`;
+}
+function renderKid(st,o){
+  G=null;
+  const p=islPct(st.best),t=p.reduce((a,x)=>a+x.got,0),weak=GAMES.filter(g=>(st.best[g.id]||0)<2).map(g=>g.name);
+  $app.innerHTML=`${o.back?'<div class="bar"><a class="back" href="#theo-doi">← Bảng theo dõi</a></div>':''}${o.top||''}
+    <div class="board"><div class="dhead"><h1>Báo cáo của ${esc(st.name)}</h1><span class="fine">Mã ${esc(st.code)} · chơi gần nhất: ${fmtDate(st.updated)} · ${t}/45 sao</span></div>
+      <div class="isl-sum">${p.map(x=>`<span class="isl-tag c${x.k}"><span class="isle-dot" aria-hidden="true"></span>${shortIsl(x.k)} ${x.got}/${x.max}</span>`).join('')}</div>
+      ${weak.length?`<div class="msg weak"><b>Chưa đạt 2 sao:</b><span>${weak.join(', ')}.</span></div>`:'<div class="msg ok"><b>Tuyệt vời!</b><span>Bé đã đạt từ 2 sao trở lên ở mọi trò chơi.</span></div>'}
+      <div class="islands">${MIXED.map(g=>`<div class="island tinted c${g.is} mini"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3>${stars(st.best[g.id]||0)}</div>`).join('')}</div></div>
+    <h2 class="sec">Bài thi thử đã nộp (${st.essays.length})</h2>
+    ${st.essays.length?st.essays.map(e=>essayCard(st,e,o.canComment)).join(''):'<p class="fine">Chưa có bài nào.</p>'}`;
+  window.scrollTo(0,0);
+}
+async function renderPlink(token){
+  G=null;$app.innerHTML='<p class="fine">Đang tải báo cáo…</p>';
+  try{const d=await call('plink',null,'&p='+encodeURIComponent(token));
+    renderKid(d.student,{back:false,canComment:false,top:'<div class="acct"><span>Báo cáo chỉ để xem, dành cho phụ huynh.</span><a class="ghost sm" href="/">Về trang trò chơi</a></div>'})}
+  catch(e){$app.innerHTML=`<div class="board"><p>${esc(e.message)}</p><div class="actions"><a class="primary" href="/">Về trang trò chơi</a></div></div>`}
+}
+async function dashAct(a,b){
+  if(a==='d-tab'){TAB=b.dataset.k;renderDash('theo-doi')}
+  else if(a==='d-refresh'){DASH=null;renderDash(location.hash.slice(1)||'theo-doi')}
+  else if(a==='d-open'){location.hash='hs-'+b.dataset.code}
+  else if(a==='d-copy'){const l=b.dataset.link;try{await navigator.clipboard.writeText(l);b.textContent='Đã sao chép'}catch(e){const i=document.createElement('input');i.readOnly=true;i.value=l;i.className='plain-in linkbox';b.replaceWith(i);i.select()}}
+  else if(a==='d-reset'||a==='d-delessay'){
+    if(b.dataset.sure!=='1'){b.dataset.sure='1';b.textContent=a==='d-reset'?'Bấm lần nữa: xóa hết sao và bài viết':'Bấm lần nữa để xóa';b.classList.add('danger');return}
+    try{
+      if(a==='d-reset'){await call('reset',{code:b.dataset.code});DASH=null}
+      else{const d=await call('essay.remove',{code:b.dataset.code,at:b.dataset.at});const st=DASH.students.find(s=>s.code===b.dataset.code);if(st)st.essays=d.essays}
+      renderDash(location.hash.slice(1)||'theo-doi');
+    }catch(e){b.textContent=e.message}
+  }
+}
+async function saveComment(f){
+  const text=f.querySelector('textarea').value,msg=f.querySelector('.saved');
+  try{const d=await call('comment',{code:f.dataset.code,at:f.dataset.at,text});const st=DASH&&DASH.students.find(s=>s.code===f.dataset.code);if(st)st.essays=d.essays;msg.textContent='Đã lưu nhận xét.'}
+  catch(e){msg.textContent=e.message}
 }
 
 /* ---------- Sự kiện ---------- */
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
-  if(a==='chgcode'){setCode('');return}
+  if(a==='logout'){logout();return}
+  if(a.startsWith('d-')){dashAct(a,b);return}
   if(!G)return;
   if(a==='pick')clickPick(+b.dataset.j);
   else if(a==='x'&&G.onAct)G.onAct(b.dataset);
@@ -428,12 +537,26 @@ document.addEventListener('click',e=>{
   else if(a==='submit')submitThi();
   else if(a==='newde'){G.newDe();render()}
 });
-document.addEventListener('submit',e=>{
-  const f=e.target.closest('[data-form="code"]');if(!f)return;e.preventDefault();
-  const v=document.getElementById('codein').value.trim().toUpperCase();
-  if(!/^[A-Z0-9]{3,20}$/.test(v)){const er=document.getElementById('codeerr');er.textContent='Mã chỉ gồm 3–20 chữ cái không dấu hoặc chữ số, không có dấu cách.';er.classList.add('err');return}
-  setCode(v);
+document.addEventListener('keydown',e=>{if(e.key==='Enter'){const r=e.target.closest&&e.target.closest('tr[data-act="d-open"]');if(r)dashAct('d-open',r)}});
+document.addEventListener('submit',async e=>{
+  const f=e.target.closest('form[data-form]');if(!f)return;e.preventDefault();
+  const kind=f.dataset.form;
+  if(kind==='student'){
+    const er=document.getElementById('err-s'),v=document.getElementById('codein').value.trim().toUpperCase();
+    if(!v){er.textContent='Em nhập mã trước nhé.';return}
+    try{me=await call('login.student',{code:v});essays=[];await loadMine();renderTotal();renderMap()}catch(x){er.textContent=x.message}
+  }else if(kind==='staff'){
+    const er=document.getElementById('err-t'),login=document.getElementById('login').value.trim(),password=document.getElementById('pw').value;
+    if(!login||!password){er.textContent='Nhập tên đăng nhập và mật khẩu.';return}
+    try{await call('login.staff',{login,password});const m=await call('me');me=m.role?m:null;best={};DASH=null;renderTotal();if(location.hash==='#theo-doi')route();else location.hash='theo-doi'}catch(x){er.textContent=x.message}
+  }else if(kind==='comment')saveComment(f);
 });
-function route(){const id=location.hash.slice(1);const g=GAMES.find(x=>x.id===id);if(g)startGame(g);else renderMap();window.scrollTo(0,0)}
+function route(){
+  const p=new URLSearchParams(location.search).get('p');if(p)return renderPlink(p);
+  const h=location.hash.slice(1);
+  if(h==='theo-doi'||h.startsWith('hs-'))return renderDash(h);
+  const g=GAMES.find(x=>x.id===h);if(g)startGame(g);else renderMap();window.scrollTo(0,0);
+}
 addEventListener('hashchange',route);
-renderTotal();route();loadServer();
+$app.innerHTML='<p class="fine">Đang tải…</p>';
+boot();
