@@ -105,7 +105,10 @@ let G=null;
 
 /* ---------- Bản đồ ---------- */
 function acct(){
-  if(isStudent())return `<div class="acct"><span>Xin chào <b>${esc(me.name)}</b> (mã ${esc(me.code)}). Sao, xu và bài thi thử của em được lưu lên mạng.</span><a class="primary sm" href="#qua">${COIN}Kệ quà</a><a class="ghost sm" href="#huy-hieu">${MEDAL}Huy hiệu</a><button class="ghost sm" data-act="logout">Đăng xuất</button></div>`;
+  if(isStudent()){const L=badgeList(xu,essays);
+    return `<div class="acct hello"><p class="hi">Xin chào <b>${esc(me.name)}</b></p><p class="sub">Sao, xu và huy hiệu của em được lưu ở đây.</p>
+      <div class="row"><a class="pill main" href="#qua">${COIN}Kệ quà · ${vn(xu.total)} xu</a><a class="pill" href="#huy-hieu">${MEDAL}Huy hiệu · ${L.filter(b=>b.ok).length}/${L.length}</a></div>
+      <div class="foot"><span class="fine">Mã của em: ${esc(me.code)}</span><button class="out" data-act="logout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg>Đăng xuất</button></div></div>`}
   if(isStaff())return `<div class="acct"><span>Đang đăng nhập: <b>${esc(me.name)}</b> · ${ROLE_VI[me.role]}.</span><span class="fine">Chơi thử ở đây không lưu sao.</span><a class="primary sm" href="#theo-doi">${me.role==='parent'?'Xem báo cáo của con':'Bảng theo dõi'}</a><button class="ghost sm" data-act="logout">Đăng xuất</button></div>`;
   return `<div class="doors">
     <form class="acct door" data-form="student"><b>Em là học sinh</b><span class="fine">Nhập mã thầy cô đã cho, đúng mã em dùng ở app tiếng Anh.</span>
