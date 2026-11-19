@@ -890,3 +890,4 @@ function route(){
 addEventListener('hashchange',route);
 $app.innerHTML='<p class="fine">Đang tải…</p>';
 boot();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
