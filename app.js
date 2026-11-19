@@ -108,6 +108,17 @@ function renderTotal(){
 let G=null;
 
 /* ---------- Bản đồ ---------- */
+/* Mục tiêu tiếp theo: món quà gần nhất chưa đủ xu và huy hiệu sắp đạt nhất */
+function goalsHtml(L){
+  const tot=xu.total||0,gifts=xu.gifts||[],g=gifts.find(x=>tot<x.m);
+  const UNIT={'Bộ câu hỏi':'câu','Đảo':'trò','Chuỗi đúng':'câu liền','Hoàn hảo':'lượt','Chăm chỉ':'ngày','Viết văn':'bài','Tối thượng':'Chúa đảo'};
+  const b=L.filter(x=>!x.ok).sort((a,c)=>(c.have/c.need-a.have/a.need)||((a.need-a.have)-(c.need-c.have)))[0];
+  const giftRow=g?`<div class="gl"><span>Quà tiếp theo: <b>${esc(g.name)}</b> · còn ${vn(g.m-tot)} xu</span><div class="gbar"><i class="gold" style="width:${Math.min(100,Math.round(tot/g.m*100))}%"></i></div></div>`
+    :gifts.length?'<div class="gl"><span>Em đã đủ xu cho mọi món quà. Vào Kệ quà để đổi nhé!</span></div>':'';
+  const badgeRow=b?`<div class="gl"><span>Huy hiệu gần nhất: <b>${esc(b.name)}</b> · còn ${b.need-b.have} ${UNIT[b.grp]||''}</span><div class="gbar"><i style="width:${Math.round(b.have/b.need*100)}%"></i></div></div>`
+    :'<div class="gl"><span>Em đã có đủ 80 huy hiệu. Tuyệt vời!</span></div>';
+  return `<div class="goals">${giftRow}${badgeRow}</div>`;
+}
 function rulesHtml(cls){
   const R=[['up','+10','Đúng ngay lần đầu'],['dn','−2','Mỗi lần sai'],['fl','+50','Đúng liền 5 câu'],['fl','+100','Đúng liền 10 câu'],['up','+10','Mỗi sao cuối lượt'],['up','+15','Chơi mỗi ngày']];
   return `<div class="rules${cls?' '+cls:''}"><p class="rt">${COIN}Cách kiếm xu đổi quà</p><div class="rg">${R.map(([c,n,l])=>`<div class="rr ${c}"><b>${n}</b><span>${l}</span></div>`).join('')}</div><p class="rgi">Đủ xu thì đổi quà ngay hoặc để dành. Đổi quà sẽ trừ xu.</p></div>`;
@@ -115,7 +126,7 @@ function rulesHtml(cls){
 function acct(){
   if(isStudent()){const L=badgeList(xu,essays);
     return `<div class="acct hello"><div class="top2"><div><p class="hi">Xin chào <b>${esc(me.name)}</b></p><p class="sub">Sao, xu và huy hiệu của em được lưu ở đây.</p>
-      <div class="row"><a class="pill main" href="#qua">${COIN}Kệ quà · ${vn(xu.total)} xu</a><a class="pill" href="#huy-hieu">${MEDAL}Huy hiệu · ${L.filter(b=>b.ok).length}/${L.length}</a></div></div>${rulesHtml()}</div>
+      <div class="row"><a class="pill main" href="#qua">${COIN}Kệ quà · ${vn(xu.total)} xu</a><a class="pill" href="#huy-hieu">${MEDAL}Huy hiệu · ${L.filter(b=>b.ok).length}/${L.length}</a></div>${goalsHtml(L)}</div>${rulesHtml()}</div>
       <div class="foot"><span class="fine">Mã của em: ${esc(me.code)}</span><button class="out" data-act="logout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg>Đăng xuất</button></div></div>`}
   if(isStaff())return `<div class="acct"><span>Đang đăng nhập: <b>${esc(me.name)}</b> · ${ROLE_VI[me.role]}.</span><span class="fine">Chơi thử ở đây không lưu sao.</span><a class="primary sm" href="#theo-doi">${me.role==='parent'?'Xem báo cáo của con':'Bảng theo dõi'}</a><button class="ghost sm" data-act="logout">Đăng xuất</button></div>`;
   return `<div class="doors">
