@@ -1,0 +1,56 @@
+# Đóng gói app Android (.apk) cho Đảo Câu Văn trên máy chủ của GitHub.
+# Chạy khi có thay đổi trong thư mục android/ hoặc khi bấm "Run workflow" trong tab Actions.
+# Tệp .apk nằm ở mục "Artifacts" của lần chạy (tên: dao-cau-van-apk).
+name: Đóng gói APK
+
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # Mật khẩu khóa ký app. Repo là riêng tư; khóa chỉ dùng để ký app gia đình này.
+      KS_PASS: daocauvan-ky-app-2026
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Tạo khóa ký app (chỉ chạy ở lần đầu)
+        run: |
+          if [ ! -f android/release.p12 ]; then
+            keytool -genkeypair -keystore android/release.p12 -storetype PKCS12 \
+              -storepass "$KS_PASS" -keypass "$KS_PASS" -alias daocauvan \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Dao Cau Van, O=Gia dinh, C=VN"
+            git config user.name "github-actions"
+            git config user.email "github-actions@users.noreply.github.com"
+            git add android/release.p12
+            git commit -m "Thêm khóa ký app Android (tạo tự động)"
+            git push
+          fi
+
+      - name: Đóng gói .apk
+        run: gradle -p android assembleRelease --no-daemon
+
+      - name: Đặt tên tệp
+        run: cp android/app/build/outputs/apk/release/app-release.apk dao-cau-van.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dao-cau-van-apk
+          path: dao-cau-van.apk

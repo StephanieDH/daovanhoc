@@ -1,3 +1,8 @@
 .vercel
 .env*
 node_modules
+
+# Android build output
+android/.gradle
+android/build
+android/app/build

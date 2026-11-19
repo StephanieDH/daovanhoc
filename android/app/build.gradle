@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'vn.daocauvan.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'vn.daocauvan.app'
+        minSdk 24
+        targetSdk 34
+        // Tăng hai số này mỗi khi phát hành bản .apk mới
+        versionCode 1
+        versionName '1.0'
+    }
+
+    // Khóa ký app: tạo một lần trên GitHub (xem .github/workflows/android.yml), lưu ở android/release.p12
+    signingConfigs {
+        release {
+            storeFile file('../release.p12')
+            storeType 'pkcs12'
+            storePassword System.getenv('KS_PASS')
+            keyAlias 'daocauvan'
+            keyPassword System.getenv('KS_PASS')
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
