@@ -13,7 +13,7 @@ const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || '');
 const LOCAL = process.env.DCV_LOCAL === '1';
 const T = 'dcv_progress';
 const DAY = 86400000;
-const GAME_IDS = ['cay-cau','tau-chu','tham-tu','ghep-cau','cau-noi','sua-cau','so-sanh','nhan-hoa','cam-thu','noi-doi','kinh-lup','tu-lay','thanh-ngu','xep-doan','thi-thu'];
+const GAME_IDS = ['cay-cau','tau-chu','tham-tu','ghep-cau','cau-noi','sua-cau','so-sanh','nhan-hoa','cam-thu','noi-doi','kinh-lup','tu-lay','thanh-ngu','xep-doan','thi-thu','dau-cau','phan-loai','nhieu-nghia','cap-tu','chinh-ta','doc-hieu'];
 
 class Bad extends Error { constructor(msg, status = 400) { super(msg); this.status = status; } }
 const bad = (m, s) => { throw new Bad(m, s); };

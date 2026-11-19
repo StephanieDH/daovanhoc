@@ -243,6 +243,21 @@ mark.m-lk{background:var(--manner-bg);color:var(--manner)}
 .cform .actions{align-items:center;margin-top:8px}
 .ghost.danger{border-color:var(--red);color:var(--red)}
 .linkbox{font:inherit;font-size:.85rem;width:100%;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)}
+.chunk.sel{border-style:solid;border-color:var(--tim);background:var(--tim-soft);color:var(--tim)}
+.chunk.word{border-style:solid;border-color:transparent;padding:0 3px}.chunk.word:hover{border-color:var(--tim)}
+.baskets{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.basket{font:inherit;cursor:pointer;border:2px dashed currentColor;border-radius:14px;padding:10px 12px;min-height:72px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left}
+.basket b{font-family:var(--font-display);font-size:1.05rem}.basket span{font-size:.9rem;font-weight:700}
+.basket:hover{border-style:solid}
+.slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.slotbox{border:2px dashed var(--line);border-radius:14px;padding:10px 14px;font-weight:700;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sentence.center{text-align:center}
+.mark{display:inline-block;min-width:26px;height:1.4em;line-height:1.4em;text-align:center;border-bottom:3px dashed var(--muted);margin:0 2px;vertical-align:baseline;font-weight:800}
+.mark.cur{border-color:var(--tim);color:var(--tim);background:var(--tim-soft);border-radius:6px 6px 0 0}
+.mark.ok{border-bottom-color:transparent;color:var(--ok)}
+.opts.marks .opt.mk{min-width:52px;font-size:1.25rem;padding:6px 14px;text-align:center}
+.sentence .passage{font-size:.78em;font-weight:600;line-height:1.8}
+.sentence .passage .q{font-size:1.1em;font-weight:800}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
@@ -264,6 +279,9 @@ mark.m-lk{background:var(--manner-bg);color:var(--manner)}
 <script src="data/tu-tu.js"></script>
 <script src="data/tu-ngu.js"></script>
 <script src="data/viet-doan.js"></script>
+<script src="data/tu-ngu-2.js"></script>
+<script src="data/dau-cau.js"></script>
+<script src="data/doc-hieu.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -23,11 +23,17 @@ const GAMES=[
  {id:'tu-lay',is:3,name:'Nhà máy từ láy',skill:'Ghép tiếng thành từ láy, phân biệt với từ ghép.'},
  {id:'thanh-ngu',is:3,name:'Giải mã thành ngữ',skill:'Hoàn thành thành ngữ, tục ngữ và hiểu nghĩa.'},
  {id:'xep-doan',is:4,name:'Xếp đoạn văn',skill:'Sắp xếp các câu thành đoạn văn mạch lạc, có liên kết.'},
- {id:'thi-thu',is:4,name:'Phòng thi thử',skill:'Viết đoạn văn theo đề, máy kiểm tra các yêu cầu của đề.'}
+ {id:'thi-thu',is:4,name:'Phòng thi thử',skill:'Viết đoạn văn theo đề, máy kiểm tra các yêu cầu của đề.'},
+ {id:'dau-cau',is:0,name:'Nhà máy dấu câu',skill:'Đặt dấu câu đúng chỗ, nhận biết câu kể, câu hỏi, câu cảm, câu khiến.'},
+ {id:'phan-loai',is:3,name:'Phân loại từ',skill:'Xếp từ vào giỏ: danh từ, động từ, tính từ, đại từ.'},
+ {id:'nhieu-nghia',is:3,name:'Một từ, nhiều nghĩa',skill:'Phân biệt nghĩa gốc, nghĩa chuyển; từ nhiều nghĩa và từ đồng âm.'},
+ {id:'cap-tu',is:3,name:'Cặp từ đối đầu',skill:'Tìm từ đồng nghĩa, trái nghĩa và chọn từ đúng sắc thái.'},
+ {id:'chinh-ta',is:3,name:'Thợ săn chính tả',skill:'Bắt lỗi l/n, s/x, tr/ch, dấu hỏi/ngã và viết hoa.'},
+ {id:'doc-hieu',is:4,name:'Đọc hiểu nhanh',skill:'Đọc đoạn văn, đoạn thơ ngắn và trả lời câu hỏi như trong đề thi.'}
 ];
 const MIXED=(()=>{const by=ISLANDS.map((_,k)=>GAMES.filter(g=>g.is===k)),out=[];for(let r=0;out.length<GAMES.length;r++)by.forEach(a=>{if(a[r])out.push(a[r])});return out})();
 /* Số câu mỗi lượt chơi */
-const PER={'cay-cau':3,'tau-chu':4,'tham-tu':5,'noi-doi':3,'xep-doan':3};
+const PER={'cay-cau':3,'tau-chu':4,'tham-tu':5,'noi-doi':3,'xep-doan':3,'phan-loai':4,'chinh-ta':6,'dau-cau':5,'doc-hieu':2};
 const QUIZ_N=6;
 
 const $app=document.getElementById('app');
@@ -38,8 +44,8 @@ const noComma=s=>s.replace(/[,.]$/,'');
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const pick=(a,n)=>shuffle(a).slice(0,n);
 const bank=id=>((window.BANK||{})[id]||[]);
-const size=id=>id==='noi-doi'?bank(id).reduce((a,s)=>a+s.split(';').length,0):bank(id).length;
-const unit=id=>id==='noi-doi'?'cặp':id==='thi-thu'?'đề':id==='xep-doan'?'đoạn':'câu';
+const size=id=>id==='noi-doi'?bank(id).reduce((a,s)=>a+s.split(';').length,0):id==='nhieu-nghia'?bank(id).reduce((a,s)=>a+(s.startsWith('P|')?1:s.split('|').length-2),0):bank(id).length;
+const unit=id=>id==='noi-doi'?'cặp':id==='thi-thu'?'đề':id==='xep-doan'?'đoạn':id==='doc-hieu'?'bài đọc':id==='cap-tu'?'lượt':'câu';
 const rows=id=>bank(id).map(s=>s.split('|'));
 const STAR='<path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z"/>';
 function stars(n,big){let h=`<span class="stars${big?' big':''}" role="img" aria-label="${n} trên 3 sao">`;for(let i=0;i<3;i++)h+=`<svg viewBox="0 0 24 24" class="${i<n?'on':''}" aria-hidden="true">${STAR}</svg>`;return h+'</span>'}
@@ -433,6 +439,160 @@ function renderEssays(){
   el.innerHTML=essays.length?`<div class="panel"><h3>Bài đã nộp (${essays.length})</h3>${essays.map(e=>`<details class="essay"${e.comment?' open':''}><summary>${stars(e.stars||0)} <span>${esc(new Date(e.at).toLocaleDateString('vi-VN'))} · ${esc(e.de)}</span>${e.comment?'<span class="badge soft">có nhận xét</span>':''}</summary><p>${esc(e.text)}</p>${e.comment?`<div class="msg info"><b>${esc(e.commentBy||'Thầy cô')}:</b><span>${esc(e.comment)}</span></div>`:''}</details>`).join('')}</div>`:'';
 }
 
+/* ---------- Phân loại từ ---------- */
+const WK={n:{n:'Danh từ',c:'place',h:'Danh từ chỉ sự vật: người, con vật, đồ vật, cây cối, hiện tượng, khái niệm.'},v:{n:'Động từ',c:'time',h:'Động từ chỉ hoạt động, trạng thái; thường đi sau “đã, đang, sẽ”.'},t:{n:'Tính từ',c:'manner',h:'Tính từ chỉ đặc điểm, tính chất như màu sắc, hình dáng, tính nết; thường đi sau “rất”.'},r:{n:'Đại từ',c:'purpose',h:'Đại từ dùng để xưng hô (tôi, chúng em, nó, họ), để hỏi (ai, gì, đâu) hoặc để thay thế.'}};
+const parseTags=s=>{const out=[];let last=0;s.replace(/\{([^|}]+)\|([nvtr])\}/g,(m,w,k,i)=>{if(i>last)out.push({x:s.slice(last,i)});out.push({w,k});last=i+m.length;return m});if(last<s.length)out.push({x:s.slice(last)});return out};
+BUILD['phan-loai']=()=>{
+  G.sents=pick(bank('phan-loai'),PER['phan-loai']).map(parseTags);G.n=G.sents.length;
+  const reset=()=>{G.sel=null;G.placed={};G.miss={};G.msg=null};reset();
+  G.view=()=>{
+    if(G.i>=G.n)return renderEnd();
+    const S=G.sents[G.i],tags=S.map((p,j)=>p.w?j:-1).filter(j=>j>=0),done=tags.every(j=>G.placed[j]);
+    const sent=S.map((p,j)=>p.w?(G.placed[j]?`<span class="pt ${WK[p.k].c}">${p.w}<sup>${WK[p.k].n}</sup></span>`:`<button class="chunk${G.sel===j?' sel':''}" data-act="x" data-w="${j}">${p.w}</button>`):esc(p.x)).join('');
+    const baskets=Object.entries(WK).map(([k,v])=>`<button class="basket ${v.c}${G.shake===k?' shake':''}" data-act="x" data-b="${k}"><b>${v.n}</b><span>${tags.filter(j=>G.placed[j]&&S[j].k===k).map(j=>S[j].w).join(', ')||'&nbsp;'}</span></button>`).join('');
+    $app.innerHTML=bar(G.g,`Câu ${G.i+1}/${G.n}`)+`<div class="board"><p class="ask">${done?'Bé đã xếp đúng hết các từ.':'Chạm một từ có viền trong câu, rồi chạm vào giỏ đúng loại từ.'}</p>
+      <div class="sentence">${sent}</div><div class="baskets">${baskets}</div>${msgHtml(G.msg)}${done?nextBtn(G.i+1>=G.n,'Câu tiếp theo'):''}</div>`;
+    G.shake=null;
+  };
+  G.onAct=d=>{
+    const S=G.sents[G.i];
+    if(d.w!=null){G.sel=+d.w;G.msg=null;return render()}
+    if(G.sel==null){G.msg={k:'info',t:'Chạm vào một từ có viền trong câu trước nhé.'};return render()}
+    const j=G.sel,p=S[j],k=d.b;
+    if(p.k===k){G.placed[j]=true;G.total++;if(!G.miss[j])G.correct++;G.sel=null;G.msg={k:'ok',t:`“${p.w}” là ${WK[k].n.toLowerCase()}. ${WK[k].h}`}}
+    else{G.miss[j]=true;G.shake=k;G.msg={k:'bad',t:`“${p.w}” không phải ${WK[k].n.toLowerCase()}. Nhớ lại: ${WK[k].h}`}}
+    render();
+  };
+  G.onNext=()=>{G.i++;reset()};
+};
+
+/* ---------- Một từ, nhiều nghĩa ---------- */
+const hl=s=>s.replace(/\*([^*]+)\*/g,'<span class="nhu">$1</span>');
+BUILD['nhieu-nghia']=()=>{
+  const all=bank('nhieu-nghia'),sets=all.filter(s=>!s.startsWith('P|')),pairs=all.filter(s=>s.startsWith('P|')),qs=[];
+  pick(sets,2).forEach(s=>{const [w,gloss,...ss]=s.split('|');shuffle(ss).forEach(x=>{const [sent,a]=x.split('=');
+    qs.push({intro:`<p class="ask">Từ <b>“${w}”</b> trong câu dưới đây mang nghĩa gốc hay nghĩa chuyển?</p>`,
+      options:[opt('Nghĩa gốc',a==='g',a==='g'?`Đây là nghĩa gốc của “${w}”: ${gloss}.`:`Nghĩa gốc của “${w}” là ${gloss}. Ở câu này, từ đã chuyển sang chỉ sự vật khác có nét giống.`),
+               opt('Nghĩa chuyển',a==='c',a==='c'?`Đây là nghĩa chuyển: từ nghĩa gốc (${gloss}) chuyển sang chỉ sự vật khác có nét giống.`:`Ở câu này, “${w}” dùng đúng nghĩa gốc: ${gloss}.`)],
+      view:()=>hl(sent)})})});
+  pick(pairs,2).forEach(s=>{const [,two,a,why]=s.split('|');
+    qs.push({intro:'<p class="ask">Hai từ được tô màu là từ nhiều nghĩa hay từ đồng âm?</p>',
+      options:[opt('Từ nhiều nghĩa',a==='nn',a==='nn'?why:'Thử nghĩ: hai nghĩa này có liên quan gì với nhau không?'),opt('Từ đồng âm',a==='da',a==='da'?why:'Hai nghĩa này có nét liên quan với nhau, hãy nghĩ lại.')],
+      view:()=>two.split(' / ').map(hl).join('<br>')})});
+  G.qs=qs;resetQuiz();
+};
+
+/* ---------- Cặp từ đối đầu ---------- */
+BUILD['cap-tu']=()=>{
+  const all=rows('cap-tu'),pairs=all.filter(r=>r[0]!=='T'),tones=all.filter(r=>r[0]==='T');
+  G.items=[...pick(pairs,4).map(([w,s,a,d])=>({type:'p',w,s,a,chips:shuffle([s,a,...d.split(',')])})),
+    ...pick(tones,2).map(([,sent,r,why,w1,y1,w2,y2])=>({type:'t',sent,ans:r,chips:shuffle([r,w1,w2]),why:{[r]:why,[w1]:y1,[w2]:y2}}))];
+  G.n=G.items.length;const reset=()=>{G.got={};G.bad=[];G.missed=false;G.msg=null};reset();
+  G.view=()=>{
+    if(G.i>=G.n)return renderEnd();
+    const it=G.items[G.i];let body,done;
+    if(it.type==='p'){done=!!(G.got.s&&G.got.a);
+      body=`<div class="sentence center">Từ gốc: <b class="nhu">${it.w}</b></div>
+        <div class="slots"><div class="slotbox">Đồng nghĩa: ${G.got.s?`<span class="pt good">${it.s}</span>`:BLANK}</div><div class="slotbox">Trái nghĩa: ${G.got.a?`<span class="pt good">${it.a}</span>`:BLANK}</div></div>`}
+    else{done=!!G.got.t;body=`<div class="sentence">${it.sent.replace('___',G.got.t?`<span class="pt good">${it.ans}</span>`:BLANK)}</div>`}
+    const chips=it.chips.map((c,j)=>{const used=it.type==='p'?((G.got.s&&c===it.s)||(G.got.a&&c===it.a)):(G.got.t&&c===it.ans);
+      return `<button class="opt${used?' on':G.bad.includes(c)?' bad':''}${G.shake===j?' shake':''}" data-act="x" data-j="${j}" ${used||G.bad.includes(c)||done?'disabled':''}>${c}</button>`}).join('');
+    $app.innerHTML=bar(G.g,`Lượt ${G.i+1}/${G.n}`)+`<div class="board"><p class="ask">${it.type==='p'?'Tìm một từ đồng nghĩa và một từ trái nghĩa với từ gốc.':'Chọn từ vừa đúng nghĩa, vừa hợp sắc thái để điền vào chỗ trống.'}</p>${body}<div class="opts">${chips}</div>${msgHtml(G.msg)}${done?nextBtn(G.i+1>=G.n,'Lượt tiếp theo'):''}</div>`;
+    G.shake=null;
+  };
+  G.onAct=d=>{
+    const it=G.items[G.i],j=+d.j,c=it.chips[j];
+    if(it.type==='p'){
+      if(c===it.s||c===it.a){const k=c===it.s?'s':'a';G.got[k]=true;G.total++;if(!G.missed)G.correct++;G.missed=false;G.msg={k:'ok',t:`“${c}” ${k==='s'?'đồng nghĩa':'trái nghĩa'} với “${it.w}”.`}}
+      else{G.bad.push(c);G.missed=true;G.shake=j;G.msg={k:'bad',t:`“${c}” không đồng nghĩa, cũng không trái nghĩa với “${it.w}”.`}}
+    }else{
+      if(c===it.ans){G.got.t=true;G.total++;if(!G.missed)G.correct++;G.msg={k:'ok',t:it.why[c]}}
+      else{G.bad.push(c);G.missed=true;G.shake=j;G.msg={k:'bad',t:it.why[c]}}
+    }
+    render();
+  };
+  G.onNext=()=>{G.i++;reset()};
+};
+
+/* ---------- Thợ săn chính tả ---------- */
+BUILD['chinh-ta']=()=>{
+  G.items=pick(rows('chinh-ta'),PER['chinh-ta']).map(([s,tip,d])=>{
+    const m=/\{([^>}]+)>([^}]+)\}/.exec(s),pre=s.slice(0,m.index),post=s.slice(m.index+m[0].length),sp=t=>t.split(/(\s+)/).filter(x=>x).map(x=>({x}));
+    return {toks:[...sp(pre),{x:m[1],bad:true},...sp(post)],wrong:m[1],right:m[2],tip,opts:shuffle([m[2],m[1],d])};
+  });
+  G.n=G.items.length;const reset=()=>{G.ph=0;G.missed=false;G.tried=[];G.msg=null};reset();
+  G.view=()=>{
+    if(G.i>=G.n)return renderEnd();
+    const it=G.items[G.i],done=G.ph===2;
+    const sent=it.toks.map((t,j)=>/^\s+$/.test(t.x)?t.x:(t.bad&&G.ph>0)?`<span class="pt ${done?'good':'bad'}">${esc(done?it.right:it.wrong)}</span>`
+      :G.ph===0?`<button class="chunk word${G.shake===j?' shake':''}${G.tried.includes(j)?' miss':''}" data-act="x" data-j="${j}">${esc(t.x)}</button>`:esc(t.x)).join('');
+    const opts=G.ph===1?`<div class="opts">${it.opts.map((o,j)=>`<button class="opt${G.tried.includes('o'+j)?' bad':''}${G.shake==='o'+j?' shake':''}" data-act="x" data-o="${j}" ${G.tried.includes('o'+j)?'disabled':''}>${esc(o)}</button>`).join('')}</div>`:'';
+    $app.innerHTML=bar(G.g,`Câu ${G.i+1}/${G.n}`)+`<div class="board"><p class="ask">${G.ph===0?'Câu có một chữ viết sai chính tả. Chạm vào chữ đó.':G.ph===1?'Chọn cách viết đúng.':'Đã sửa xong.'}</p>
+      <div class="sentence">${sent}</div>${opts}${msgHtml(G.msg)}${done?nextBtn(G.i+1>=G.n,'Câu tiếp theo'):''}</div>`;
+    G.shake=null;
+  };
+  G.onAct=d=>{
+    const it=G.items[G.i];
+    if(G.ph===0&&d.j!=null){const j=+d.j,t=it.toks[j];
+      if(t.bad){G.ph=1;G.tried=[];G.msg={k:'info',t:`Đúng là chữ “${t.x}” viết sai. Giờ chọn cách viết đúng.`}}
+      else{G.missed=true;if(!G.tried.includes(j))G.tried.push(j);G.shake=j;G.msg={k:'bad',t:`Chữ “${t.x.replace(/[.,!?;:]+$/,'')}” viết đúng rồi. Tìm chữ khác nhé.`}}
+      return render();
+    }
+    if(G.ph===1&&d.o!=null){const o=it.opts[+d.o];
+      if(o===it.right){G.ph=2;G.total++;if(!G.missed)G.correct++;G.msg={k:'ok',t:`Viết đúng là “${it.right}”. ${it.tip}`}}
+      else{G.missed=true;G.tried.push('o'+d.o);G.shake='o'+d.o;G.msg={k:'bad',t:`“${o}” chưa đúng. Gợi ý: ${it.tip}`}}
+      render();
+    }
+  };
+  G.onNext=()=>{G.i++;reset()};
+};
+
+/* ---------- Nhà máy dấu câu ---------- */
+const MARKS=['.',',','?','!',':',';','–','“','”','(',')'];
+const MHINT={'.':'Dấu chấm đặt cuối câu kể.',',':'Dấu phẩy ngăn trạng ngữ với chủ ngữ – vị ngữ, ngăn các từ cùng loại, ngăn các vế câu ghép, hoặc đặt sau từ cảm thán.','?':'Dấu chấm hỏi đặt cuối câu hỏi.','!':'Dấu chấm than đặt cuối câu cảm hoặc câu khiến.',':':'Dấu hai chấm báo hiệu phần liệt kê, giải thích hoặc lời nói trực tiếp đứng sau.',';':'Dấu chấm phẩy ngăn các vế câu ghép có cấu tạo giống nhau.','–':'Dấu gạch ngang đánh dấu phần chú thích hoặc nối các tên trong một liên danh.','“':'Dấu ngoặc kép mở đầu lời nói trực tiếp hoặc tên tác phẩm.','”':'Dấu ngoặc kép đóng lại lời nói trực tiếp hoặc tên tác phẩm.','(':'Dấu ngoặc đơn mở đầu phần chú thích.',')':'Dấu ngoặc đơn đóng lại phần chú thích.'};
+const KIEU={ke:['Câu kể','Câu kể dùng để kể, tả, giới thiệu; cuối câu thường có dấu chấm.'],hoi:['Câu hỏi','Câu hỏi dùng để hỏi điều chưa biết; cuối câu có dấu chấm hỏi.'],cam:['Câu cảm','Câu cảm bộc lộ cảm xúc, thường có “ôi, chà, trời ơi…”; cuối câu có dấu chấm than.'],khien:['Câu khiến','Câu khiến dùng để yêu cầu, đề nghị, khuyên bảo, thường có “hãy, đừng, nhé, đi, thôi”.']};
+BUILD['dau-cau']=()=>{
+  G.items=pick(rows('dau-cau'),PER['dau-cau']).map(([s,kind])=>{const parts=[];let last=0;s.replace(/\{([^}]+)\}/g,(m,mk,i)=>{parts.push({x:s.slice(last,i)});parts.push({m:mk});last=i+m.length;return m});parts.push({x:s.slice(last)});return {parts,kind}});
+  G.n=G.items.length;const reset=()=>{G.k=0;G.missed=false;G.kdone=false;G.tried=[];G.msg=null};reset();
+  G.view=()=>{
+    if(G.i>=G.n)return renderEnd();
+    const it=G.items[G.i],slots=it.parts.filter(p=>p.m),marksDone=G.k>=slots.length,askKind=marksDone&&it.kind!=='-'&&!G.kdone,done=marksDone&&!askKind;
+    let si=-1;
+    const sent=it.parts.map(p=>{if(!p.m)return esc(p.x);si++;return si<G.k?`<span class="mark ok">${esc(p.m)}</span>`:`<span class="mark${si===G.k?' cur':''}${si===G.k&&G.shake?' shake':''}">${si===G.k?'?':''}</span>`}).join('');
+    let ctl='';
+    if(!marksDone)ctl=`<div class="opts marks">${MARKS.map(m=>`<button class="opt mk${G.tried.includes(m)?' bad':''}" data-act="x" data-m="${esc(m)}" ${G.tried.includes(m)?'disabled':''} aria-label="Dấu ${esc(m)}">${esc(m)}</button>`).join('')}</div>`;
+    else if(askKind)ctl=`<div class="opts">${Object.entries(KIEU).map(([k,v])=>`<button class="opt${G.tried.includes('k'+k)?' bad':''}" data-act="x" data-kind="${k}" ${G.tried.includes('k'+k)?'disabled':''}>${v[0]}</button>`).join('')}</div>`;
+    $app.innerHTML=bar(G.g,`Câu ${G.i+1}/${G.n}`)+`<div class="board"><p class="ask">${!marksDone?`Chọn dấu câu cho ô có dấu hỏi (ô ${G.k+1}/${slots.length}).`:askKind?'Câu này thuộc kiểu câu nào?':'Đã hoàn thành câu này.'}</p>
+      <div class="sentence">${sent}</div>${ctl}${msgHtml(G.msg)}${done?nextBtn(G.i+1>=G.n,'Câu tiếp theo'):''}</div>`;
+    G.shake=null;
+  };
+  G.onAct=d=>{
+    const it=G.items[G.i],slots=it.parts.filter(p=>p.m);
+    if(d.m!=null&&G.k<slots.length){const want=slots[G.k].m;
+      if(d.m===want){G.total++;if(!G.missed)G.correct++;G.missed=false;G.tried=[];G.k++;G.msg={k:'ok',t:MHINT[want]}}
+      else{G.missed=true;G.tried.push(d.m);G.shake=1;G.msg={k:'bad',t:`Dấu “${d.m}”: ${MHINT[d.m]} Chỗ này cần dấu khác.`}}
+      return render();
+    }
+    if(d.kind){const want=it.kind;
+      if(d.kind===want){G.kdone=true;G.total++;if(!G.missed)G.correct++;G.missed=false;G.msg={k:'ok',t:KIEU[want][1]}}
+      else{G.missed=true;G.tried.push('k'+d.kind);G.msg={k:'bad',t:`Chưa phải ${KIEU[d.kind][0].toLowerCase()}. ${KIEU[d.kind][1]}`}}
+      render();
+    }
+  };
+  G.onNext=()=>{G.i++;reset()};
+};
+
+/* ---------- Đọc hiểu nhanh ---------- */
+const READ_MISS='Đọc lại đoạn văn và tìm chi tiết liên quan nhé.';
+BUILD['doc-hieu']=()=>{
+  const qs=[];
+  pick(rows('doc-hieu'),PER['doc-hieu']).forEach(([p,by,qq])=>{const qa=qq.split('#');qa.forEach((q,n)=>{const [qt,r,why,w1,w2]=q.split('~');
+    qs.push({intro:`<p class="ask">Đọc kĩ đoạn văn rồi trả lời câu hỏi ${n+1}/${qa.length}.</p>`,col:true,
+      options:shuffle([opt(r,true,why),opt(w1,false,READ_MISS),opt(w2,false,READ_MISS)]),
+      view:()=>`<div class="poem passage">${esc(p).split('/').join('<br>')}${by?`<div class="by">${esc(by)}</div>`:''}<div class="q">${esc(qt)}</div></div>`})})});
+  G.qs=qs;resetQuiz();
+};
+
 /* ---------- Bảng theo dõi: thầy cô, Admin, phụ huynh ---------- */
 let DASH=null,TAB='hs';
 const ENG_APP='https://english-exam-web-roan.vercel.app';
@@ -458,7 +618,7 @@ function tableStudents(S){
   if(!act.length)return `<div class="board"><p>Chưa có học sinh nào. Thêm học sinh trong <a href="${ENG_APP}" target="_blank" rel="noopener">app tiếng Anh</a>, mã sẽ tự có ở đây.</p></div>`;
   return `<div class="tablewrap"><table class="dt"><thead><tr><th>Học sinh</th>${ISLANDS.map((x,k)=>`<th class="c${k}"><span class="isle-dot"></span>${shortIsl(k)}</th>`).join('')}<th>Sao</th><th>Chơi gần nhất</th></tr></thead><tbody>
     ${act.map(s=>{const p=islPct(s.best),t=p.reduce((a,x)=>a+x.got,0),w=s.essays.filter(e=>!e.comment).length;
-      return `<tr class="link" data-act="d-open" data-code="${esc(s.code)}" tabindex="0"><td><b>${esc(s.name)}</b>${w?` <span class="badge" title="Bài chờ nhận xét">${w}</span>`:''}<br><span class="fine">${esc(s.code)}</span></td>${p.map(x=>`<td class="c${x.k}"><div class="pbar"><i style="width:${Math.round(x.got/x.max*100)}%"></i></div><span class="fine">${x.got}/${x.max}</span></td>`).join('')}<td><b>${t}</b>/45</td><td>${fmtDate(s.updated)}</td></tr>`}).join('')}
+      return `<tr class="link" data-act="d-open" data-code="${esc(s.code)}" tabindex="0"><td><b>${esc(s.name)}</b>${w?` <span class="badge" title="Bài chờ nhận xét">${w}</span>`:''}<br><span class="fine">${esc(s.code)}</span></td>${p.map(x=>`<td class="c${x.k}"><div class="pbar"><i style="width:${Math.round(x.got/x.max*100)}%"></i></div><span class="fine">${x.got}/${x.max}</span></td>`).join('')}<td><b>${t}</b>/${GAMES.length*3}</td><td>${fmtDate(s.updated)}</td></tr>`}).join('')}
     </tbody></table></div><p class="fine">Bấm vào một học sinh để xem 15 trò chơi và các bài thi thử.</p>`;
 }
 function essayFeed(S){
@@ -484,13 +644,13 @@ function adminPanel(S){
 }
 function listParent(S){
   $app.innerHTML=`<div class="dhead"><h1>Báo cáo của các con</h1><span class="fine">${esc(me.name)} · Phụ huynh</span></div>
-    <div class="islands">${S.map(s=>{const t=islPct(s.best).reduce((a,x)=>a+x.got,0);return `<a class="island" href="#hs-${esc(s.code)}"><h3>${esc(s.name)}</h3><p>Mã ${esc(s.code)} · ${t}/45 sao · chơi gần nhất: ${fmtDate(s.updated)}</p></a>`}).join('')||'<p>Chưa có con nào được gắn với tài khoản này.</p>'}</div>`;
+    <div class="islands">${S.map(s=>{const t=islPct(s.best).reduce((a,x)=>a+x.got,0);return `<a class="island" href="#hs-${esc(s.code)}"><h3>${esc(s.name)}</h3><p>Mã ${esc(s.code)} · ${t}/${GAMES.length*3} sao · chơi gần nhất: ${fmtDate(s.updated)}</p></a>`}).join('')||'<p>Chưa có con nào được gắn với tài khoản này.</p>'}</div>`;
 }
 function renderKid(st,o){
   G=null;
   const p=islPct(st.best),t=p.reduce((a,x)=>a+x.got,0),weak=GAMES.filter(g=>(st.best[g.id]||0)<2).map(g=>g.name);
   $app.innerHTML=`${o.back?'<div class="bar"><a class="back" href="#theo-doi">← Bảng theo dõi</a></div>':''}${o.top||''}
-    <div class="board"><div class="dhead"><h1>Báo cáo của ${esc(st.name)}</h1><span class="fine">Mã ${esc(st.code)} · chơi gần nhất: ${fmtDate(st.updated)} · ${t}/45 sao</span></div>
+    <div class="board"><div class="dhead"><h1>Báo cáo của ${esc(st.name)}</h1><span class="fine">Mã ${esc(st.code)} · chơi gần nhất: ${fmtDate(st.updated)} · ${t}/${GAMES.length*3} sao</span></div>
       <div class="isl-sum">${p.map(x=>`<span class="isl-tag c${x.k}"><span class="isle-dot" aria-hidden="true"></span>${shortIsl(x.k)} ${x.got}/${x.max}</span>`).join('')}</div>
       ${weak.length?`<div class="msg weak"><b>Chưa đạt 2 sao:</b><span>${weak.join(', ')}.</span></div>`:'<div class="msg ok"><b>Tuyệt vời!</b><span>Bé đã đạt từ 2 sao trở lên ở mọi trò chơi.</span></div>'}
       <div class="islands">${MIXED.map(g=>`<div class="island tinted c${g.is} mini"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3>${stars(st.best[g.id]||0)}</div>`).join('')}</div></div>
