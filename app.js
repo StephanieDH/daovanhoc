@@ -104,10 +104,14 @@ function renderTotal(){
 let G=null;
 
 /* ---------- Bản đồ ---------- */
+function rulesHtml(cls){
+  const R=[['up','+10','Đúng ngay lần đầu'],['dn','−2','Mỗi lần sai'],['fl','+50','Đúng liền 5 câu'],['fl','+100','Đúng liền 10 câu'],['up','+10','Mỗi sao cuối lượt'],['up','+15','Chơi mỗi ngày']];
+  return `<div class="rules${cls?' '+cls:''}"><p class="rt">${COIN}Cách kiếm xu đổi quà</p><div class="rg">${R.map(([c,n,l])=>`<div class="rr ${c}"><b>${n}</b><span>${l}</span></div>`).join('')}</div><p class="rgi">Đủ xu thì đổi quà ngay hoặc để dành. Đổi quà sẽ trừ xu.</p></div>`;
+}
 function acct(){
   if(isStudent()){const L=badgeList(xu,essays);
-    return `<div class="acct hello"><p class="hi">Xin chào <b>${esc(me.name)}</b></p><p class="sub">Sao, xu và huy hiệu của em được lưu ở đây.</p>
-      <div class="row"><a class="pill main" href="#qua">${COIN}Kệ quà · ${vn(xu.total)} xu</a><a class="pill" href="#huy-hieu">${MEDAL}Huy hiệu · ${L.filter(b=>b.ok).length}/${L.length}</a></div>
+    return `<div class="acct hello"><div class="top2"><div><p class="hi">Xin chào <b>${esc(me.name)}</b></p><p class="sub">Sao, xu và huy hiệu của em được lưu ở đây.</p>
+      <div class="row"><a class="pill main" href="#qua">${COIN}Kệ quà · ${vn(xu.total)} xu</a><a class="pill" href="#huy-hieu">${MEDAL}Huy hiệu · ${L.filter(b=>b.ok).length}/${L.length}</a></div></div>${rulesHtml()}</div>
       <div class="foot"><span class="fine">Mã của em: ${esc(me.code)}</span><button class="out" data-act="logout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg>Đăng xuất</button></div></div>`}
   if(isStaff())return `<div class="acct"><span>Đang đăng nhập: <b>${esc(me.name)}</b> · ${ROLE_VI[me.role]}.</span><span class="fine">Chơi thử ở đây không lưu sao.</span><a class="primary sm" href="#theo-doi">${me.role==='parent'?'Xem báo cáo của con':'Bảng theo dõi'}</a><button class="ghost sm" data-act="logout">Đăng xuất</button></div>`;
   return `<div class="doors">
@@ -734,8 +738,8 @@ function renderShelf(){
   G=null;
   if(!isStudent()){$app.innerHTML='<div class="board"><p>Kệ quà dành cho học sinh đã nhập mã. Hãy nhập mã ở trang chủ.</p><div class="actions"><a class="primary" href="#">Về trang chủ</a></div></div>';return}
   $app.innerHTML=`<div class="bar"><a class="back" href="#">← Bản đồ</a><div class="gtitle">Kệ quà của ${esc(me.name)}</div></div>
-    <div class="board">${shelfHtml(xu,{student:true})}<div id="shelfmsg" role="status"></div>
-    <p class="fine">Mỗi câu đúng ngay lần đầu được 10 xu, trả lời sai bị trừ 2 xu. Đúng liên tiếp 5 câu được thưởng thêm 50 xu, 10 câu được thưởng thêm 100 xu. Đủ xu tới mốc nào, em có thể đổi ngay hoặc tích tiếp để đổi quà to hơn. Đổi quà sẽ trừ đúng số xu của mốc đó; nếu bố mẹ hay thầy cô chưa đồng ý thì xu được trả lại.</p></div>`;
+    <div class="board">${rulesHtml('wide')}${shelfHtml(xu,{student:true})}<div id="shelfmsg" role="status"></div>
+    </div>`;
 }
 function giftFeed(S){
   const all=[];S.forEach(s=>(s.xu.req||[]).forEach(r=>all.push({s,r})));
