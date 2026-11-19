@@ -4,7 +4,7 @@ Mã nguồn đã sẵn sàng trong thư mục này (git, nhánh `main`). Bạn l
 
 ## 1. GitHub: tạo kho trống
 1. Vào https://github.com/new (tài khoản StephanieDH).
-2. Repository name: `dao-cau-van`, chọn **Private**.
+2. Repository name: `daovanhoc` (đã tạo), chọn **Private**.
 3. **Không** tick "Add a README", không thêm .gitignore hay license.
 4. Bấm **Create repository**, rồi báo Claude để Claude đẩy mã lên.
 
@@ -14,7 +14,7 @@ Mã nguồn đã sẵn sàng trong thư mục này (git, nhánh `main`). Bạn l
 3. Bảng `dcv_progress` xuất hiện trong Table Editor là xong.
 
 ## 3. Vercel: tạo trang web
-1. Vào https://vercel.com/new → **Import** kho `dao-cau-van`.
+1. Vào https://vercel.com/new → **Import** kho `daovanhoc`.
 2. Framework Preset: **Other**. Không cần sửa Build Command.
 3. Mở **Environment Variables**, thêm 2 biến:
    - `SUPABASE_URL`: lấy ở Supabase → Project Settings → API → Project URL.

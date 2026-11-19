@@ -1,7 +1,10 @@
 // Vercel serverless function: lưu và đọc số sao, bài thi thử theo mã học sinh.
 // Cần 2 biến môi trường trên Vercel: SUPABASE_URL và SUPABASE_SERVICE_ROLE_KEY (khóa bí mật, chỉ nằm trên máy chủ).
-const BASE = process.env.SUPABASE_URL;
-const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Chỉ lấy phần gốc của địa chỉ, nên dán kèm "/rest/v1/" hay dấu cách thừa vẫn chạy.
+const BASE = (() => { try { return new URL(String(process.env.SUPABASE_URL || '').trim()).origin; } catch (e) { return ''; } })();
+const KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+// Khóa kiểu cũ (JWT, bắt đầu bằng eyJ) gửi cả ở Authorization; khóa kiểu mới (sb_secret_…) chỉ gửi ở apikey.
+const AUTH = KEY.startsWith('eyJ') ? { Authorization: `Bearer ${KEY}` } : {};
 const TABLE = 'dcv_progress';
 const GAME_IDS = ['cay-cau','tau-chu','tham-tu','ghep-cau','cau-noi','sua-cau','so-sanh','nhan-hoa','cam-thu','noi-doi','kinh-lup','tu-lay','thanh-ngu','xep-doan','thi-thu'];
 const okCode = c => /^[A-Z0-9]{3,20}$/.test(c);
@@ -9,10 +12,10 @@ const okCode = c => /^[A-Z0-9]{3,20}$/.test(c);
 async function sb(path, opt = {}) {
   const r = await fetch(`${BASE}/rest/v1/${path}`, {
     ...opt,
-    headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json', ...(opt.headers || {}) }
+    headers: { apikey: KEY, ...AUTH, 'Content-Type': 'application/json', ...(opt.headers || {}) }
   });
   const t = await r.text();
-  if (!r.ok) throw new Error(`supabase ${r.status}: ${t}`);
+  if (!r.ok) { const e = new Error(`supabase ${r.status}: ${t}`); e.sb = r.status; e.hint = (t.match(/"(?:message|hint)"\s*:\s*"([^"]{0,160})/) || [])[1]; throw e; }
   return t ? JSON.parse(t) : null;
 }
 async function load(code) {
@@ -53,6 +56,7 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'method' });
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ error: 'server' });
+    // Trả về mã lỗi của Supabase (không có khóa) để dễ tìm nguyên nhân.
+    return res.status(500).json({ error: 'server', supabase: e.sb || null, hint: e.hint || (e.sb ? null : String(e.message || '').slice(0, 120)) });
   }
 };
