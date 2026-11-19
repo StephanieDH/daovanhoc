@@ -29,11 +29,11 @@ async function sb(path, opt = {}) {
 const enc = encodeURIComponent;
 async function kvGet(col, id) { const r = await sb(`kv?collection=eq.${enc(col)}&id=eq.${enc(id)}&select=data`); return r && r[0] ? r[0].data : null; }
 async function kvList(col) { return ((await sb(`kv?collection=eq.${enc(col)}&select=data&order=id`)) || []).map(r => r.data); }
-async function prog(code) { const r = await sb(`${T}?code=eq.${enc(code)}&select=code,best,essays,updated_at`); return r && r[0] ? r[0] : { code, best: {}, essays: [], updated_at: null }; }
-async function progAll() { return (await sb(`${T}?select=code,best,essays,updated_at`)) || []; }
+async function prog(code) { const r = await sb(`${T}?code=eq.${enc(code)}&select=code,best,essays,xu,updated_at`); return r && r[0] ? r[0] : { code, best: {}, essays: [], xu: {}, updated_at: null }; }
+async function progAll() { return (await sb(`${T}?select=code,best,essays,xu,updated_at`)) || []; }
 async function progPut(p) {
   await sb(T, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ code: p.code, best: p.best || {}, essays: p.essays || [], updated_at: new Date().toISOString() }) });
+    body: JSON.stringify({ code: p.code, best: p.best || {}, essays: p.essays || [], xu: p.xu || {}, updated_at: new Date().toISOString() }) });
 }
 
 // ---------- đăng nhập (giống app tiếng Anh: scrypt, cookie kí HMAC)
@@ -65,8 +65,17 @@ const need = (me, roles) => { if (!me) bad('Hãy đăng nhập lại.', 401); if
 
 // ---------- dữ liệu gửi về trình duyệt
 const essaysOut = es => (Array.isArray(es) ? es : []).map(e => ({ at: e.at, de: e.de, text: e.text, stars: e.stars, comment: e.comment || '', commentBy: e.commentBy || '', commentAt: e.commentAt || null }));
+// ---------- xu và quà
+const DEFAULT_GIFTS = [
+  { m: 200, name: "Huy hiệu “Thợ câu chữ”" }, { m: 500, name: "Quà nhỏ: bộ sticker hoặc bút màu" }, { m: 1000, name: "Một cuốn truyện" },
+  { m: 2000, name: "Đi chơi cuối tuần" }, { m: 5000, name: "Quà đặc biệt do bố mẹ chọn" }];
+const giftsOf = x => (Array.isArray(x && x.gifts) && x.gifts.length ? x.gifts : DEFAULT_GIFTS);
+const vnDay = (ms = Date.now()) => new Date(ms + 7 * 3600000).toISOString().slice(0, 10);
+function dayStreak(days, today) { const set = new Set(days); let n = 0, d = Date.parse(today + "T00:00:00Z"); while (set.has(new Date(d).toISOString().slice(0, 10))) { n++; d -= DAY; } return n; }
+const xuOut = x => { x = x || {}; return { total: x.total || 0, peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()) }; };
+const canKid = (me, code) => me.role === "teacher" || me.role === "admin" || (me.role === "parent" && (me.kids || []).includes(code));
 function report(st, p, withLink) {
-  const o = { code: st.code, name: st.name || st.code, active: !!st.active, best: (p && p.best) || {}, essays: essaysOut(p && p.essays), updated: (p && p.updated_at) || null };
+  const o = { code: st.code, name: st.name || st.code, active: !!st.active, best: (p && p.best) || {}, essays: essaysOut(p && p.essays), xu: xuOut(p && p.xu), updated: (p && p.updated_at) || null };
   if (withLink) o.plink = st.ptoken && !st.poff ? st.ptoken : null;
   return o;
 }
@@ -118,13 +127,52 @@ async function handle(req, res) {
     const game = String(body.game || ''), stars = Math.max(0, Math.min(3, parseInt(body.stars, 10) || 0));
     if (!GAME_IDS.includes(game)) bad('Trò chơi không đúng.');
     const p = await prog(me.code);
+    const prevStars = (p.best || {})[game] || 0;
     p.best = { ...(p.best || {}) }; if (!(p.best[game] >= stars)) p.best[game] = stars;
+    // xu: phần cộng/trừ trong lượt chơi do trình duyệt gửi lên (giới hạn hợp lí), thưởng thêm do máy chủ tính
+    const x = { ...(p.xu || {}) }, bonus = [];
+    const delta = Math.max(-500, Math.min(900, parseInt(body.xu, 10) || 0));
+    if (stars === 3 && prevStars < 3) bonus.push(["Lần đầu đạt 3 sao ở trò này", 50]);
+    const today = vnDay(); x.days = Array.isArray(x.days) ? x.days : [];
+    if (!x.days.includes(today)) {
+      bonus.push(["Chơi hôm nay", 15]); x.days = [...x.days, today].slice(-60);
+      const s = dayStreak(x.days, today); if (s > 0 && s % 7 === 0) bonus.push([`Chơi đều ${s} ngày liên tiếp`, 100]);
+    }
+    x.total = Math.max(0, (x.total || 0) + delta + bonus.reduce((a, b) => a + b[1], 0)); x.peak = Math.max(x.peak || 0, x.total);
+    p.xu = x; p.bonus = bonus;
     p.essays = Array.isArray(p.essays) ? p.essays : [];
     if (game === 'thi-thu' && body.essay && body.essay.text) {
       p.essays = [{ at: new Date().toISOString(), de: String(body.essay.de || '').slice(0, 300), text: String(body.essay.text).slice(0, 5000), stars }, ...p.essays].slice(0, 50);
     }
     await progPut(p);
-    return out(report({ code: me.code, name: me.name, active: true }, p, false));
+    return out({ ...report({ code: me.code, name: me.name, active: true }, p, false), bonus: p.bonus });
+  }
+  if (a === "gift.request") {
+    const me = need(await who(req), ["student"]);
+    const p = await prog(me.code), x = { ...(p.xu || {}) }, m = parseInt(body.m, 10);
+    const g = giftsOf(x).find(z => z.m === m); if (!g) bad("Không có món quà này.", 404);
+    if ((x.peak || 0) < m) bad("Em chưa đủ xu để đổi món quà này.");
+    x.req = Array.isArray(x.req) ? x.req : [];
+    if (x.req.some(r => r.m === m && (r.status === "pending" || r.status === "given"))) bad("Em đã xin đổi món quà này rồi.");
+    x.req.push({ id: Date.now().toString(36), m, name: g.name, at: new Date().toISOString(), status: "pending" });
+    p.xu = x; await progPut(p); return out({ xu: xuOut(x) });
+  }
+  if (a === "gift.decide") {
+    const me = need(await who(req), ["teacher", "admin", "parent"]);
+    const code = String(body.code || "").toUpperCase(); if (!canKid(me, code)) bad("Tài khoản này không xem được học sinh này.", 403);
+    const p = await prog(code), x = { ...(p.xu || {}) }, r = (x.req || []).find(z => z.id === String(body.id || ""));
+    if (!r) bad("Không tìm thấy yêu cầu đổi quà.", 404); if (r.status !== "pending") bad("Yêu cầu này đã được xử lí.");
+    r.status = body.ok ? "given" : "refused"; r.by = me.name; r.doneAt = new Date().toISOString();
+    p.xu = x; await progPut(p); return out({ xu: xuOut(x) });
+  }
+  if (a === "gift.set") {
+    const me = need(await who(req), ["teacher", "admin", "parent"]);
+    const code = String(body.code || "").toUpperCase(); if (!canKid(me, code)) bad("Tài khoản này không xem được học sinh này.", 403);
+    const list = (Array.isArray(body.gifts) ? body.gifts : []).map(g => ({ m: parseInt(g.m, 10), name: String(g.name || "").trim().slice(0, 80) }))
+      .filter(g => g.name && g.m >= 10 && g.m <= 100000).sort((a, b) => a.m - b.m).slice(0, 10);
+    if (new Set(list.map(g => g.m)).size !== list.length) bad("Mỗi mốc xu chỉ đặt một món quà.");
+    const p = await prog(code), x = { ...(p.xu || {}) }; x.gifts = list.length ? list : undefined;
+    p.xu = x; await progPut(p); return out({ xu: xuOut(x) });
   }
 
   // Thầy cô, Admin, phụ huynh (tài khoản): bảng theo dõi

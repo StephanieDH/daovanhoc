@@ -57,6 +57,10 @@ let me=null;   /* {role:'student'|'teacher'|'parent'|'admin', ...}; null = chơi
 let net='';    /* 'ok' có máy chủ, 'off' không kết nối được */
 let best=LS.get('dcv-best-guest',{})||{};
 let essays=[];
+const COIN='<svg class="coin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="6"/></svg>';
+const FLAME='<svg class="flame" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.6 3.4 4.5 5.2 4.5 10a4.5 4.5 0 0 1-9 0c0-2 1-3.4 2.2-4.4-.1 1.6.6 2.7 1.7 3.1C11.2 9 10.9 5.6 12 2.5z"/></svg>';
+const XU={first:10,second:5,later:2,wrong:-5,s5:20,s10:50,star:10,thiSubmit:20,thiFull:30};
+let xu=LS.get('dcv-xu-guest',{total:0,peak:0})||{total:0,peak:0};
 const isStudent=()=>!!me&&me.role==='student';
 const isStaff=()=>!!me&&['teacher','admin','parent'].includes(me.role);
 const ROLE_VI={student:'Học sinh',teacher:'Thầy cô',parent:'Phụ huynh',admin:'Admin'};
@@ -72,33 +76,39 @@ async function boot(){
   renderTotal();route();
 }
 async function loadMine(){
-  best=LS.get('dcv-best-'+me.code,{})||{};
-  try{const d=await call('progress');for(const k in d.best)if(!(best[k]>=d.best[k]))best[k]=d.best[k];essays=d.essays||[];LS.set('dcv-best-'+me.code,best)}catch(e){}
+  best=LS.get('dcv-best-'+me.code,{})||{};xu={total:0,peak:0,gifts:[],req:[]};
+  try{const d=await call('progress');for(const k in d.best)if(!(best[k]>=d.best[k]))best[k]=d.best[k];essays=d.essays||[];xu=d.xu||xu;LS.set('dcv-best-'+me.code,best)}catch(e){}
 }
-function saveBest(id,s,essay){
-  if(isStaff())return;   /* thầy cô, phụ huynh chơi thử: không lưu */
-  if(!(best[id]>=s))best[id]=s;LS.set(isStudent()?'dcv-best-'+me.code:'dcv-best-guest',best);renderTotal();
-  if(isStudent())call('save',{game:id,stars:s,essay}).then(d=>{essays=d.essays||essays;if(G&&G.g.id==='thi-thu')renderEssays()}).catch(()=>{});
+async function saveRound(id,s,essay){
+  const delta=G?G.xu:0;if(G)G.xu=0;
+  if(isStaff())return {bonus:[],total:null};   /* thầy cô, phụ huynh chơi thử: không lưu */
+  if(!(best[id]>=s))best[id]=s;LS.set(isStudent()?'dcv-best-'+me.code:'dcv-best-guest',best);
+  if(isStudent()){
+    try{const d=await call('save',{game:id,stars:s,essay,xu:delta});essays=d.essays||essays;xu=d.xu||xu;renderTotal();if(G&&G.g.id==='thi-thu')renderEssays();return {bonus:d.bonus||[],total:xu.total}}
+    catch(e){renderTotal();return {bonus:[],total:null,err:e.message}}
+  }
+  xu.total=Math.max(0,(xu.total||0)+delta);xu.peak=Math.max(xu.peak||0,xu.total);LS.set('dcv-xu-guest',{total:xu.total,peak:xu.peak});renderTotal();
+  return {bonus:[],total:xu.total};
 }
-async function logout(){try{await call('logout',{})}catch(e){}me=null;essays=[];DASH=null;best=LS.get('dcv-best-guest',{})||{};renderTotal();if(location.hash)location.hash='';else renderMap()}
+async function logout(){try{await call('logout',{})}catch(e){}me=null;essays=[];DASH=null;best=LS.get('dcv-best-guest',{})||{};xu=LS.get('dcv-xu-guest',{total:0,peak:0})||{total:0,peak:0};renderTotal();if(location.hash)location.hash='';else renderMap()}
 function renderTotal(){
   const t=GAMES.reduce((a,g)=>a+(best[g.id]||0),0);
   document.getElementById('total').innerHTML=(me?`<span class="who">${esc(isStudent()?me.name+' · '+me.code:me.name)}</span>`:'')+
-    (isStaff()?`<a class="who-link" href="#theo-doi">${me.role==='parent'?'Báo cáo của con':'Bảng theo dõi'}</a>`:`<svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg>${t} / ${GAMES.length*3} sao`);
+    (isStaff()?`<a class="who-link" href="#theo-doi">${me.role==='parent'?'Báo cáo của con':'Bảng theo dõi'}</a>`:`<svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg>${t}/${GAMES.length*3}<a class="xu-link" href="#qua" title="Kệ quà">${COIN}<b>${Math.max(0,(xu.total||0)+((G&&G.xu)||0))}</b> xu</a>`);
 }
 
 let G=null;
 
 /* ---------- Bản đồ ---------- */
 function acct(){
-  if(isStudent())return `<div class="acct"><span>Xin chào <b>${esc(me.name)}</b> (mã ${esc(me.code)}). Sao và bài thi thử của em được lưu lên mạng.</span><button class="ghost sm" data-act="logout">Đăng xuất</button></div>`;
+  if(isStudent())return `<div class="acct"><span>Xin chào <b>${esc(me.name)}</b> (mã ${esc(me.code)}). Sao, xu và bài thi thử của em được lưu lên mạng.</span><a class="primary sm" href="#qua">${COIN}Kệ quà</a><button class="ghost sm" data-act="logout">Đăng xuất</button></div>`;
   if(isStaff())return `<div class="acct"><span>Đang đăng nhập: <b>${esc(me.name)}</b> · ${ROLE_VI[me.role]}.</span><span class="fine">Chơi thử ở đây không lưu sao.</span><a class="primary sm" href="#theo-doi">${me.role==='parent'?'Xem báo cáo của con':'Bảng theo dõi'}</a><button class="ghost sm" data-act="logout">Đăng xuất</button></div>`;
   return `<div class="doors">
     <form class="acct door" data-form="student"><b>Em là học sinh</b><span class="fine">Nhập mã thầy cô đã cho, đúng mã em dùng ở app tiếng Anh.</span>
       <div class="row"><input id="codein" maxlength="20" placeholder="AN0307" autocomplete="off" aria-label="Mã học sinh"><button class="primary" type="submit">Vào chơi</button></div><span class="fine err" id="err-s"></span></form>
     <form class="acct door" data-form="staff"><b>Thầy cô · Bố mẹ · Admin</b><span class="fine">Đăng nhập bằng tài khoản của app tiếng Anh.</span>
       <div class="row"><input id="login" class="plain-in" placeholder="Tên đăng nhập" autocomplete="username" aria-label="Tên đăng nhập"><input id="pw" class="plain-in" type="password" placeholder="Mật khẩu" autocomplete="current-password" aria-label="Mật khẩu"><button class="primary" type="submit">Đăng nhập</button></div><span class="fine err" id="err-t"></span></form>
-  </div><p class="fine guest">${net==='off'?'Chưa kết nối được máy chủ. ':''}Chưa đăng nhập vẫn chơi thử được, nhưng sao chỉ lưu trên máy này.</p>`;
+  </div><p class="fine guest">${net==='off'?'Chưa kết nối được máy chủ. ':''}Chưa đăng nhập vẫn chơi thử được, nhưng sao và xu chỉ lưu trên máy này và chưa đổi được quà.</p>`;
 }
 function renderMap(){
   G=null;
@@ -110,13 +120,14 @@ function renderMap(){
   <div class="islands">${MIXED.map(g=>`<a class="island tinted c${g.is}" href="#${g.id}"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><p>${g.skill}</p><span class="count">${size(g.id)} ${unit(g.id)}</span>${stars(best[g.id]||0)}</a>`).join('')}</div>
   <p class="note">Ngân hàng có ${total} câu hỏi. Mỗi lượt chơi bốc ngẫu nhiên vài câu, nên mỗi lần chơi sẽ khác nhau.</p>`;
 }
-function bar(g,prog){return `<div class="bar"><a class="back" href="#">← Bản đồ</a><div class="gtitle"><span class="isl-tag c${g.is}">${ISLANDS[g.is].name}</span>${g.name}</div>${prog?`<div class="prog">${prog}</div>`:''}</div>`}
+const streakHtml=()=>G&&G.streak>=2?`${FLAME}Chuỗi ${G.streak}`:'';
+function bar(g,prog){return `<div class="bar"><a class="back" href="#">← Bản đồ</a><div class="gtitle"><span class="isl-tag c${g.is}">${ISLANDS[g.is].name}</span>${g.name}</div><span class="streak" id="streak" aria-live="polite">${streakHtml()}</span>${prog?`<div class="prog">${prog}</div>`:''}</div>`}
 function msgHtml(m){if(!m)return '';const t={ok:'Đúng rồi!',bad:'Chưa đúng.',weak:'Gần đúng.',info:'Gợi ý:'}[m.k];return `<div class="msg ${m.k}" role="status"><b>${t}</b><span>${m.t}</span></div>`}
 const nextBtn=(last,a,b)=>`<div class="actions"><button class="primary" data-act="next">${last?'Xem kết quả':a}</button></div>`;
 
 /* ---------- Khung chung ---------- */
 function startGame(g){
-  G={g,i:0,correct:0,total:0,msg:null,shake:null};
+  G={g,i:0,correct:0,total:0,msg:null,shake:null,xu:0,xuLines:[],streak:0,since:0};
   if(!bank(g.id).length){$app.innerHTML=bar(g)+'<div class="board"><p>Chưa tải được câu hỏi. Hãy tải lại trang.</p></div>';return}
   BUILD[g.id]();render();
 }
@@ -125,14 +136,41 @@ function next(){
   if(G.onNext)G.onNext();else{G.total++;G.i++;resetQuiz()}
   render();window.scrollTo(0,0);
 }
+function toast(n,label){
+  let box=document.getElementById('toasts');if(!box){box=document.createElement('div');box.id='toasts';box.setAttribute('aria-live','polite');document.body.appendChild(box)}
+  while(box.children.length>=2)box.firstChild.remove();
+  const el=document.createElement('div');el.className='toast '+(n>0?'up':n<0?'down':'zero');el.textContent=(n>0?'+'+n+' xu · ':n<0?n+' xu · ':'')+label;box.appendChild(el);setTimeout(()=>el.remove(),2300);
+}
+function xuAdd(n,label,quiet){if(!G||isStaff())return;G.xu+=n;G.xuLines.push([label,n]);if(!quiet)toast(n,label);renderTotal()}
+function xuJudge(prev){
+  if(!G||isStaff()||G.ended)return;const m=G.msg;if(!m||m===prev)return;
+  if(m.k==='ok'){const tries=G.since;G.since=0;
+    if(tries===0){xuAdd(XU.first,'Đúng ngay lần đầu');G.streak++;if(G.streak%10===0)xuAdd(XU.s10,`Chuỗi ${G.streak} câu đúng liên tiếp!`);else if(G.streak%5===0)xuAdd(XU.s5,`Chuỗi ${G.streak} câu đúng liên tiếp!`)}
+    else{xuAdd(tries===1?XU.second:XU.later,tries===1?'Đúng ở lần thử thứ hai':'Đúng sau nhiều lần thử');G.streak=0}}
+  else if(m.k==='bad'){G.since++;xuAdd(XU.wrong,G.streak>=2?'Trả lời sai, mất chuỗi':'Trả lời sai');G.streak=0}
+  else if(m.k==='weak'){G.since++;if(G.streak>=2)toast(0,'Gần đúng, mất chuỗi');G.streak=0}
+  const el=document.getElementById('streak');if(el)el.innerHTML=streakHtml();
+}
+function groupLines(L){const m=new Map();L.forEach(([l,n])=>{const k=l+'|'+n,o=m.get(k)||{l,n,c:0};o.c++;m.set(k,o)});return [...m.values()]}
+function xuSumHtml(lines,delta,r){
+  const rows=lines.map(o=>`<li><span>${esc(o.l)}${o.c>1?` × ${o.c}`:''}</span><b class="${o.n<0?'neg':''}">${o.n>0?'+':''}${o.n*o.c}</b></li>`).join('');
+  const bon=r?(r.bonus||[]).map(([l,n])=>`<li class="bonus"><span>${esc(l)}</span><b>+${n}</b></li>`).join(''):'';
+  const sum=delta+(r?(r.bonus||[]).reduce((a,b)=>a+b[1],0):0);
+  return `<h3>Xu của lượt này</h3><ul>${rows||'<li><span>Chưa có xu nào</span><b>0</b></li>'}${bon}</ul><p class="xu-total">${sum>=0?'+':''}${sum} xu${r&&r.total!=null?` · Tổng: ${r.total} xu`:r&&r.err?' · Chưa lưu được, kiểm tra mạng.':r?'':' · Đang lưu…'}</p>${isStudent()?'<a class="ghost sm" href="#qua">Xem kệ quà</a>':me?'':'<p class="fine">Nhập mã học sinh ở trang chủ để được đổi quà.</p>'}`;
+}
 function renderEnd(){
-  const st=starsFrom(G.correct,G.total);saveBest(G.g.id,st);
+  if(G.endHtml){$app.innerHTML=G.endHtml;return}
+  const st=starsFrom(G.correct,G.total);
+  if(st&&!isStaff())xuAdd(st*XU.star,`Đạt ${st} sao`,true);
+  G.ended=true;const lines=groupLines(G.xuLines),delta=G.xu,gid=G.g.id;
   const idx=GAMES.indexOf(G.g),nx=GAMES[idx+1];
   $app.innerHTML=bar(G.g)+`<div class="board end">
     <div class="stamp"><span><span class="big">${st}</span>sao</span></div>${stars(st,true)}
     <h2>Hoàn thành “${G.g.name}”!</h2>
     <p>Bé làm đúng ngay lần đầu ${G.correct}/${G.total} lần.${st<3?' Chơi lại để lấy đủ 3 sao nhé.':''}</p>
+    ${isStaff()?'':`<div class="xu-sum" id="xusum">${xuSumHtml(lines,delta,null)}</div>`}
     <div class="actions" style="justify-content:center"><button class="ghost" data-act="again">Chơi lượt mới</button>${nx?`<a class="primary" href="#${nx.id}">Chơi tiếp: ${nx.name}</a>`:'<a class="primary" href="#">Về bản đồ</a>'}</div></div>`;
+  const g0=G;saveRound(gid,st).then(r=>{const el=document.getElementById('xusum');if(el)el.innerHTML=xuSumHtml(lines,delta,r);if(G===g0)G.endHtml=$app.innerHTML});
 }
 
 /* Trắc nghiệm dùng chung */
@@ -198,7 +236,7 @@ BUILD['cay-cau']=()=>{
   };
   G.onAct=d=>{
     const s=d.s,j=+d.j,o=G.rounds[G.i].opts[s][j],label=lc(noComma(o[0]));
-    if(o[1]===s){G.pick[s]=j;if(!(s in G.res))G.res[s]=true;G.msg={k:'ok',t:`“${label}” trả lời câu hỏi ${SL[s].q}`}}
+    if(o[1]===s){const had=G.pick[s]!=null;G.pick[s]=j;if(!(s in G.res))G.res[s]=true;G.msg=had?{k:'info',t:`Đã đổi sang “${label}”, câu vẫn đúng.`}:{k:'ok',t:`“${label}” trả lời câu hỏi ${SL[s].q}`}}
     else{G.wrong[s]=(G.wrong[s]||[]).concat(j);G.res[s]=false;G.shake=s+j;G.msg={k:'bad',t:`“${label}” trả lời câu hỏi ${SL[o[1]].q} Hãy tìm cụm từ trả lời câu hỏi ${SL[s].q}`}}
     render();
   };
@@ -360,7 +398,7 @@ BUILD['xep-doan']=()=>{
     G.shake=null;
   };
   G.onAct=d=>{const X=G.paras[G.i],j=+d.j,want=G.placed.length;
-    if(j===want){G.placed.push(j);G.total++;if(!G.miss)G.correct++;G.miss=false;G.msg=G.placed.length===X.s.length?{k:'ok',t:'Đoạn văn đã mạch lạc. Bé đọc to cả đoạn nhé.'}:null}
+    if(j===want){G.placed.push(j);G.total++;if(!G.miss)G.correct++;G.miss=false;G.msg=G.placed.length===X.s.length?{k:'ok',t:'Đoạn văn đã mạch lạc. Bé đọc to cả đoạn nhé.'}:{k:'ok',t:'Câu này đúng vị trí. Câu tiếp theo là câu nào?'}}
     else{G.miss=true;G.shake=j;G.msg={k:'bad',t:want===0?'Câu này chưa phải câu mở đầu. Câu mở đầu thường giới thiệu thời gian hoặc sự vật được nói tới.':'Câu này chưa phải câu tiếp theo. Chú ý các từ nối như “đầu tiên”, “rồi”, “sau đó”, “cuối cùng”.'}}
     render()};
   G.onNext=()=>{G.i++;init();G.msg=null};
@@ -430,8 +468,12 @@ function updateThi(){
 function submitThi(){
   if(G.text.trim().length<20){document.getElementById('result').innerHTML='<div class="msg weak"><b>Khoan đã.</b><span>Bé viết thêm rồi hãy nộp bài nhé.</span></div>';return}
   const a=updateThi(),cs=checks(a),met=cs.filter(c=>c.ok).length,n=cs.length,st=met===n?3:met===n-1?2:met>=1?1:0;
-  saveBest('thi-thu',st,isStudent()?{de:G.de.de,text:G.text}:undefined);
-  document.getElementById('result').innerHTML=`<div class="msg ${st===3?'ok':'weak'}"><b>${stars(st)}</b><span>${st===3?'Bài làm đạt đủ yêu cầu của đề. Giỏi lắm!':`Bài làm đạt ${met}/${n} yêu cầu. Xem bảng kiểm tra để sửa và nộp lại nhé.`}${isStudent()?' Bài đã được lưu, thầy cô sẽ đọc và nhận xét.':isStaff()?' (Chơi thử: bài không được lưu.)':''}</span></div>`;
+  if(!isStaff()){G.subs=G.subs||{};const k=G.de.de;
+    if(!G.subs[k]){G.subs[k]=1;xuAdd(XU.thiSubmit,'Nộp bài thi thử',true);if(st)xuAdd(st*XU.star,`Đạt ${st} sao`,true)}
+    if(st===3&&!G.subs[k+'#3']){G.subs[k+'#3']=1;xuAdd(XU.thiFull,'Bài đạt đủ yêu cầu của đề',true)}}
+  const lines=groupLines(G.xuLines),delta=G.xu;G.xuLines=[];
+  document.getElementById('result').innerHTML=`<div class="msg ${st===3?'ok':'weak'}"><b>${stars(st)}</b><span>${st===3?'Bài làm đạt đủ yêu cầu của đề. Giỏi lắm!':`Bài làm đạt ${met}/${n} yêu cầu. Xem bảng kiểm tra để sửa và nộp lại nhé.`}${isStudent()?' Bài đã được lưu, thầy cô sẽ đọc và nhận xét.':isStaff()?' (Chơi thử: bài không được lưu.)':''}</span></div>${isStaff()?'':`<div class="xu-sum" id="xusum">${xuSumHtml(lines,delta,null)}</div>`}`;
+  saveRound('thi-thu',st,isStudent()?{de:G.de.de,text:G.text}:undefined).then(r=>{const el=document.getElementById('xusum');if(el)el.innerHTML=xuSumHtml(lines,delta,r)});
 }
 function renderEssays(){
   const el=document.getElementById('essays');if(!el)return;
@@ -604,22 +646,23 @@ async function renderDash(h){
   if(!isStaff()){$app.innerHTML=`<div class="board"><p>Trang này dành cho thầy cô, phụ huynh và Admin. Hãy đăng nhập ở trang chủ.</p><div class="actions"><a class="primary" href="#">Về trang chủ</a></div></div>`;return}
   if(!DASH){$app.innerHTML='<p class="fine">Đang tải bảng theo dõi…</p>';try{DASH=await call('dash')}catch(e){$app.innerHTML=`<div class="board"><p>${esc(e.message)}</p></div>`;return}}
   const S=DASH.students;
-  if(h.startsWith('hs-')){const st=S.find(s=>s.code===h.slice(3));if(st)return renderKid(st,{back:me.role!=='parent'||S.length>1,canComment:me.role!=='parent'});h='theo-doi'}
-  if(me.role==='parent'){if(S.length===1)return renderKid(S[0],{back:false,canComment:false});return listParent(S)}
+  if(h.startsWith('hs-')){const st=S.find(s=>s.code===h.slice(3));if(st)return renderKid(st,{back:me.role!=='parent'||S.length>1,canComment:me.role!=='parent',canGift:true});h='theo-doi'}
+  if(me.role==='parent'){if(S.length===1)return renderKid(S[0],{back:false,canComment:false,canGift:true});return listParent(S)}
   const wait=S.reduce((a,s)=>a+s.essays.filter(e=>!e.comment).length,0);
-  const tabs=[['hs','Học sinh'],['bai',`Bài viết chờ nhận xét${wait?` <span class="badge">${wait}</span>`:''}`]].concat(me.role==='admin'?[['ql','Quản lý']]:[]);
+  const pend=S.reduce((a,s)=>a+(s.xu.req||[]).filter(r=>r.status==='pending').length,0);
+  const tabs=[['hs','Học sinh'],['bai',`Bài viết chờ nhận xét${wait?` <span class="badge">${wait}</span>`:''}`],['qua',`Đổi quà${pend?` <span class="badge">${pend}</span>`:''}`]].concat(me.role==='admin'?[['ql','Quản lý']]:[]);
   if(TAB==='ql'&&me.role!=='admin')TAB='hs';
-  const body=TAB==='hs'?tableStudents(S):TAB==='bai'?essayFeed(S):adminPanel(S);
+  const body=TAB==='hs'?tableStudents(S):TAB==='bai'?essayFeed(S):TAB==='qua'?giftFeed(S):adminPanel(S);
   $app.innerHTML=`<div class="dhead"><h1>Bảng theo dõi</h1><span class="fine">${esc(me.name)} · ${ROLE_VI[me.role]}</span><button class="ghost sm" data-act="d-refresh">Tải lại</button></div>
     <div class="tabs" role="tablist">${tabs.map(([k,t])=>`<button class="tab${TAB===k?' on':''}" role="tab" aria-selected="${TAB===k}" data-act="d-tab" data-k="${k}">${t}</button>`).join('')}</div>${body}`;
 }
 function tableStudents(S){
   const act=S.filter(s=>s.active);
   if(!act.length)return `<div class="board"><p>Chưa có học sinh nào. Thêm học sinh trong <a href="${ENG_APP}" target="_blank" rel="noopener">app tiếng Anh</a>, mã sẽ tự có ở đây.</p></div>`;
-  return `<div class="tablewrap"><table class="dt"><thead><tr><th>Học sinh</th>${ISLANDS.map((x,k)=>`<th class="c${k}"><span class="isle-dot"></span>${shortIsl(k)}</th>`).join('')}<th>Sao</th><th>Chơi gần nhất</th></tr></thead><tbody>
+  return `<div class="tablewrap"><table class="dt"><thead><tr><th>Học sinh</th>${ISLANDS.map((x,k)=>`<th class="c${k}"><span class="isle-dot"></span>${shortIsl(k)}</th>`).join('')}<th>Sao</th><th>Xu</th><th>Chơi gần nhất</th></tr></thead><tbody>
     ${act.map(s=>{const p=islPct(s.best),t=p.reduce((a,x)=>a+x.got,0),w=s.essays.filter(e=>!e.comment).length;
-      return `<tr class="link" data-act="d-open" data-code="${esc(s.code)}" tabindex="0"><td><b>${esc(s.name)}</b>${w?` <span class="badge" title="Bài chờ nhận xét">${w}</span>`:''}<br><span class="fine">${esc(s.code)}</span></td>${p.map(x=>`<td class="c${x.k}"><div class="pbar"><i style="width:${Math.round(x.got/x.max*100)}%"></i></div><span class="fine">${x.got}/${x.max}</span></td>`).join('')}<td><b>${t}</b>/${GAMES.length*3}</td><td>${fmtDate(s.updated)}</td></tr>`}).join('')}
-    </tbody></table></div><p class="fine">Bấm vào một học sinh để xem 15 trò chơi và các bài thi thử.</p>`;
+      return `<tr class="link" data-act="d-open" data-code="${esc(s.code)}" tabindex="0"><td><b>${esc(s.name)}</b>${w?` <span class="badge" title="Bài chờ nhận xét">${w}</span>`:''}<br><span class="fine">${esc(s.code)}</span></td>${p.map(x=>`<td class="c${x.k}"><div class="pbar"><i style="width:${Math.round(x.got/x.max*100)}%"></i></div><span class="fine">${x.got}/${x.max}</span></td>`).join('')}<td><b>${t}</b>/${GAMES.length*3}</td><td>${s.xu.total}${(s.xu.req||[]).some(r=>r.status==='pending')?' <span class="badge soft">xin quà</span>':''}</td><td>${fmtDate(s.updated)}</td></tr>`}).join('')}
+    </tbody></table></div><p class="fine">Bấm vào một học sinh để xem từng trò chơi, bài thi thử, xu và quà.</p>`;
 }
 function essayFeed(S){
   const all=[];S.forEach(s=>s.essays.forEach(e=>all.push({s,e})));
@@ -654,9 +697,55 @@ function renderKid(st,o){
       <div class="isl-sum">${p.map(x=>`<span class="isl-tag c${x.k}"><span class="isle-dot" aria-hidden="true"></span>${shortIsl(x.k)} ${x.got}/${x.max}</span>`).join('')}</div>
       ${weak.length?`<div class="msg weak"><b>Chưa đạt 2 sao:</b><span>${weak.join(', ')}.</span></div>`:'<div class="msg ok"><b>Tuyệt vời!</b><span>Bé đã đạt từ 2 sao trở lên ở mọi trò chơi.</span></div>'}
       <div class="islands">${MIXED.map(g=>`<div class="island tinted c${g.is} mini"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3>${stars(st.best[g.id]||0)}</div>`).join('')}</div></div>
+    <h2 class="sec">Xu và quà</h2><div class="board">${shelfHtml(st.xu,{code:st.code,canDecide:!!o.canGift})}${o.canGift?giftEditor(st):''}</div>
     <h2 class="sec">Bài thi thử đã nộp (${st.essays.length})</h2>
     ${st.essays.length?st.essays.map(e=>essayCard(st,e,o.canComment)).join(''):'<p class="fine">Chưa có bài nào.</p>'}`;
   window.scrollTo(0,0);
+}
+function giftState(g,x){const r=(x.req||[]).filter(q=>q.m===g.m).slice(-1)[0];if(r&&r.status==='given')return 'given';if(r&&r.status==='pending')return 'pending';if((x.peak||0)>=g.m)return r&&r.status==='refused'?'refused':'open';return 'locked'}
+function shelfHtml(x,o){
+  x=x||{};const gifts=x.gifts||[],peak=x.peak||0,nextG=gifts.find(g=>peak<g.m),prevG=[...gifts].reverse().find(g=>peak>=g.m),base=prevG?prevG.m:0;
+  const pct=nextG?Math.max(0,Math.min(100,Math.round((peak-base)/(nextG.m-base)*100))):100;
+  return `<div class="xu-head">${COIN}<b>${x.total||0}</b> xu<span class="fine">Cao nhất từng đạt: ${peak} xu${x.streak?` · chơi liên tục ${x.streak} ngày`:''}</span></div>
+    ${nextG?`<div class="meter-row"><span>Còn ${nextG.m-peak} xu nữa tới mốc ${nextG.m}</span><div class="meter"><div style="width:${pct}%"></div></div></div>`:gifts.length?'<p class="fine">Đã mở khóa tất cả các mốc quà!</p>':''}
+    <div class="gifts">${gifts.map(g=>{const s=giftState(g,x),req=(x.req||[]).filter(q=>q.m===g.m&&q.status==='pending').slice(-1)[0];
+      const act=o.student?(s==='open'||s==='refused'?`<button class="primary sm" data-act="g-req" data-m="${g.m}">Xin đổi quà</button>`:'')
+        :(o.canDecide&&req?`<div class="actions"><button class="primary sm" data-act="g-ok" data-code="${esc(o.code)}" data-id="${esc(req.id)}">Đã trao quà</button><button class="ghost sm" data-act="g-no" data-code="${esc(o.code)}" data-id="${esc(req.id)}">Chưa đồng ý</button></div>`:'');
+      const lab={given:'Đã nhận quà',pending:'Đang chờ người lớn duyệt',refused:'Lần trước chưa được đồng ý',open:'Đã đủ xu',locked:'Chưa đủ xu'}[s];
+      return `<div class="gift ${s}"><b>${g.m.toLocaleString('vi-VN')} xu</b><span>${esc(g.name)}</span><span class="fine">${lab}</span>${act}</div>`}).join('')}</div>`;
+}
+function renderShelf(){
+  G=null;
+  if(!isStudent()){$app.innerHTML='<div class="board"><p>Kệ quà dành cho học sinh đã nhập mã. Hãy nhập mã ở trang chủ.</p><div class="actions"><a class="primary" href="#">Về trang chủ</a></div></div>';return}
+  $app.innerHTML=`<div class="bar"><a class="back" href="#">← Bản đồ</a><div class="gtitle">Kệ quà của ${esc(me.name)}</div></div>
+    <div class="board">${shelfHtml(xu,{student:true})}<div id="shelfmsg" role="status"></div>
+    <p class="fine">Mỗi câu đúng ngay lần đầu được 10 xu, trả lời sai bị trừ 5 xu, đúng liên tiếp 5 câu được thưởng 20 xu. Đủ xu tới mốc nào thì bấm “Xin đổi quà”, bố mẹ hoặc thầy cô sẽ duyệt và trao quà cho em. Đổi quà không làm mất xu.</p></div>`;
+}
+function giftFeed(S){
+  const all=[];S.forEach(s=>(s.xu.req||[]).forEach(r=>all.push({s,r})));
+  const pend=all.filter(x=>x.r.status==='pending'),done=all.filter(x=>x.r.status!=='pending').sort((a,b)=>(b.r.doneAt||'')>(a.r.doneAt||'')?1:-1).slice(0,10);
+  const row=({s,r})=>`<div class="board grq"><div><b>${esc(s.name)}</b> <span class="fine">${esc(s.code)} · ${fmtDate(r.at)}</span><br>Xin đổi: <b>${esc(r.name)}</b> (mốc ${r.m} xu)</div>
+    ${r.status==='pending'?`<div class="actions"><button class="primary sm" data-act="g-ok" data-code="${esc(s.code)}" data-id="${esc(r.id)}">Đã trao quà</button><button class="ghost sm" data-act="g-no" data-code="${esc(s.code)}" data-id="${esc(r.id)}">Chưa đồng ý</button></div>`
+    :`<span class="fine">${r.status==='given'?'Đã trao':'Chưa đồng ý'} · ${esc(r.by||'')}</span>`}</div>`;
+  return (pend.length?pend.map(row).join(''):'<div class="board"><p>Không có yêu cầu đổi quà nào đang chờ.</p></div>')+(done.length?'<h2 class="sec">Đã xử lí gần đây</h2>'+done.map(row).join(''):'');
+}
+function giftEditor(st){
+  const g=(st.xu&&st.xu.gifts)||[],rows=[...g,...Array(Math.max(0,7-g.length)).fill({m:'',name:''})].slice(0,10);
+  return `<details class="gedit"><summary>Sửa danh sách quà của ${esc(st.name)}</summary><form data-form="gifts" data-code="${esc(st.code)}">
+    <div class="grows">${rows.map((r,i)=>`<div class="grow"><input type="number" min="10" step="10" class="plain-in" name="m${i}" value="${r.m}" placeholder="Mốc xu" aria-label="Mốc xu ${i+1}"><input class="plain-in" name="n${i}" value="${esc(r.name||'')}" placeholder="Tên quà" aria-label="Tên quà ${i+1}" maxlength="80"></div>`).join('')}</div>
+    <div class="actions"><button class="primary sm" type="submit">Lưu danh sách quà</button><span class="fine saved" role="status"></span></div>
+    <p class="fine">Dòng nào để trống sẽ bị bỏ qua. Xóa hết rồi lưu thì quay về danh sách quà mặc định.</p></form></details>`;
+}
+async function giftAct(a,b){
+  if(a==='g-req'){const msg=document.getElementById('shelfmsg');try{const d=await call('gift.request',{m:+b.dataset.m});xu=d.xu;renderShelf();const m2=document.getElementById('shelfmsg');if(m2)m2.innerHTML='<div class="msg ok"><b>Đã gửi!</b><span>Bố mẹ hoặc thầy cô sẽ duyệt yêu cầu đổi quà của em.</span></div>'}catch(e){if(msg)msg.innerHTML=`<div class="msg bad"><b>Chưa gửi được.</b><span>${esc(e.message)}</span></div>`}return}
+  try{const d=await call('gift.decide',{code:b.dataset.code,id:b.dataset.id,ok:a==='g-ok'});const st=DASH&&DASH.students.find(s=>s.code===b.dataset.code);if(st)st.xu=d.xu;renderDash(location.hash.slice(1)||'theo-doi')}
+  catch(e){b.textContent=e.message}
+}
+async function saveGifts(f){
+  const msg=f.querySelector('.saved'),gifts=[];
+  for(let i=0;i<10;i++){const m=f.elements['m'+i],n=f.elements['n'+i];if(!m||!n)break;if(m.value&&n.value.trim())gifts.push({m:+m.value,name:n.value.trim()})}
+  try{const d=await call('gift.set',{code:f.dataset.code,gifts});const st=DASH&&DASH.students.find(s=>s.code===f.dataset.code);if(st)st.xu=d.xu;renderDash(location.hash.slice(1)||'theo-doi')}
+  catch(e){msg.textContent=e.message}
 }
 async function renderPlink(token){
   G=null;$app.innerHTML='<p class="fine">Đang tải báo cáo…</p>';
@@ -689,9 +778,11 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
   if(a==='logout'){logout();return}
   if(a.startsWith('d-')){dashAct(a,b);return}
+  if(a.startsWith('g-')){giftAct(a,b);return}
   if(!G)return;
-  if(a==='pick')clickPick(+b.dataset.j);
-  else if(a==='x'&&G.onAct)G.onAct(b.dataset);
+  const prev=G.msg;
+  if(a==='pick'){clickPick(+b.dataset.j);xuJudge(prev)}
+  else if(a==='x'&&G.onAct){G.onAct(b.dataset);xuJudge(prev)}
   else if(a==='next')next();
   else if(a==='again'){startGame(G.g);window.scrollTo(0,0)}
   else if(a==='submit')submitThi();
@@ -710,11 +801,13 @@ document.addEventListener('submit',async e=>{
     if(!login||!password){er.textContent='Nhập tên đăng nhập và mật khẩu.';return}
     try{await call('login.staff',{login,password});const m=await call('me');me=m.role?m:null;best={};DASH=null;renderTotal();if(location.hash==='#theo-doi')route();else location.hash='theo-doi'}catch(x){er.textContent=x.message}
   }else if(kind==='comment')saveComment(f);
+  else if(kind==='gifts')saveGifts(f);
 });
 function route(){
   const p=new URLSearchParams(location.search).get('p');if(p)return renderPlink(p);
   const h=location.hash.slice(1);
   if(h==='theo-doi'||h.startsWith('hs-'))return renderDash(h);
+  if(h==='qua')return renderShelf();
   const g=GAMES.find(x=>x.id===h);if(g)startGame(g);else renderMap();window.scrollTo(0,0);
 }
 addEventListener('hashchange',route);

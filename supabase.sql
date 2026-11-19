@@ -10,3 +10,6 @@ create table if not exists public.dcv_progress (
 -- Bật bảo mật theo dòng và KHÔNG tạo policy nào:
 -- trình duyệt không đọc/ghi trực tiếp được, chỉ máy chủ Vercel (dùng khóa service_role) mới truy cập.
 alter table public.dcv_progress enable row level security;
+
+-- Thêm ngày 2026-11-19: cột lưu xu, mốc quà và yêu cầu đổi quà (chạy một lần; chạy lại cũng không sao)
+alter table public.dcv_progress add column if not exists xu jsonb not null default '{}'::jsonb;
