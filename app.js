@@ -59,7 +59,7 @@ let best=LS.get('dcv-best-guest',{})||{};
 let essays=[];
 const COIN='<svg class="coin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="6"/></svg>';
 const FLAME='<svg class="flame" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.6 3.4 4.5 5.2 4.5 10a4.5 4.5 0 0 1-9 0c0-2 1-3.4 2.2-4.4-.1 1.6.6 2.7 1.7 3.1C11.2 9 10.9 5.6 12 2.5z"/></svg>';
-const XU={first:10,second:5,later:2,wrong:-5,s5:20,s10:50,star:10,thiSubmit:20,thiFull:30};
+const XU={first:10,second:5,later:2,wrong:-2,s5:50,s10:100,star:10,thiSubmit:20,thiFull:30};
 let xu=LS.get('dcv-xu-guest',{total:0,peak:0})||{total:0,peak:0};
 const isStudent=()=>!!me&&me.role==='student';
 const isStaff=()=>!!me&&['teacher','admin','parent'].includes(me.role);
@@ -84,7 +84,11 @@ async function saveRound(id,s,essay){
   if(isStaff())return {bonus:[],total:null};   /* thầy cô, phụ huynh chơi thử: không lưu */
   if(!(best[id]>=s))best[id]=s;LS.set(isStudent()?'dcv-best-'+me.code:'dcv-best-guest',best);
   if(isStudent()){
-    try{const d=await call('save',{game:id,stars:s,essay,xu:delta});essays=d.essays||essays;xu=d.xu||xu;renderTotal();if(G&&G.g.id==='thi-thu')renderEssays();return {bonus:d.bonus||[],total:xu.total}}
+    const before=new Set(badgeList(xu,essays).filter(b=>b.ok).map(b=>b.id));
+    const solved=solvedKeys(),perfect=!!(G&&G.seen&&G.seen.size&&!G.anyDirty&&id!=='thi-thu');
+    try{const d=await call('save',{game:id,stars:s,essay,xu:delta,solved,maxStreak:G?G.maxStreak||0:0,perfect});essays=d.essays||essays;xu=d.xu||xu;renderTotal();if(G&&G.g.id==='thi-thu')renderEssays();
+      const fresh=badgeList(xu,essays).filter(b=>b.ok&&!before.has(b.id));fresh.forEach(b=>toast(0,'Huy hiệu mới: '+b.name));
+      return {bonus:d.bonus||[],total:xu.total,badges:fresh.map(b=>b.name)}}
     catch(e){renderTotal();return {bonus:[],total:null,err:e.message}}
   }
   xu.total=Math.max(0,(xu.total||0)+delta);xu.peak=Math.max(xu.peak||0,xu.total);LS.set('dcv-xu-guest',{total:xu.total,peak:xu.peak});renderTotal();
@@ -101,7 +105,7 @@ let G=null;
 
 /* ---------- Bản đồ ---------- */
 function acct(){
-  if(isStudent())return `<div class="acct"><span>Xin chào <b>${esc(me.name)}</b> (mã ${esc(me.code)}). Sao, xu và bài thi thử của em được lưu lên mạng.</span><a class="primary sm" href="#qua">${COIN}Kệ quà</a><button class="ghost sm" data-act="logout">Đăng xuất</button></div>`;
+  if(isStudent())return `<div class="acct"><span>Xin chào <b>${esc(me.name)}</b> (mã ${esc(me.code)}). Sao, xu và bài thi thử của em được lưu lên mạng.</span><a class="primary sm" href="#qua">${COIN}Kệ quà</a><a class="ghost sm" href="#huy-hieu">${MEDAL}Huy hiệu</a><button class="ghost sm" data-act="logout">Đăng xuất</button></div>`;
   if(isStaff())return `<div class="acct"><span>Đang đăng nhập: <b>${esc(me.name)}</b> · ${ROLE_VI[me.role]}.</span><span class="fine">Chơi thử ở đây không lưu sao.</span><a class="primary sm" href="#theo-doi">${me.role==='parent'?'Xem báo cáo của con':'Bảng theo dõi'}</a><button class="ghost sm" data-act="logout">Đăng xuất</button></div>`;
   return `<div class="doors">
     <form class="acct door" data-form="student"><b>Em là học sinh</b><span class="fine">Nhập mã thầy cô đã cho, đúng mã em dùng ở app tiếng Anh.</span>
@@ -132,7 +136,13 @@ function startGame(g){
   BUILD[g.id]();render();
 }
 function render(){if(!G)return renderMap();(G.view||renderQuiz)()}
+function rowKey(){return G.qs?(G.qs[G.i]||{}).key:(G.rowKeys||[])[G.i]}
+function markDirty(){const k=rowKey();if(k!=null)(G.dirty=G.dirty||new Set()).add(k);G.anyDirty=true}
+function markRow(){const k=rowKey();if(k!=null)(G.seen=G.seen||new Set()).add(k)}
+function solvedKeys(){return G?[...(G.seen||[])].filter(k=>!(G.dirty||new Set()).has(k)):[]}
+function pickK(arr,n){const p=pick(arr.map((r,ix)=>[r,ix]),n);G.rowKeys=p.map(x=>x[1]);return p.map(x=>x[0])}
 function next(){
+  markRow();
   if(G.onNext)G.onNext();else{G.total++;G.i++;resetQuiz()}
   render();window.scrollTo(0,0);
 }
@@ -145,10 +155,10 @@ function xuAdd(n,label,quiet){if(!G||isStaff())return;G.xu+=n;G.xuLines.push([la
 function xuJudge(prev){
   if(!G||isStaff()||G.ended)return;const m=G.msg;if(!m||m===prev)return;
   if(m.k==='ok'){const tries=G.since;G.since=0;
-    if(tries===0){xuAdd(XU.first,'Đúng ngay lần đầu');G.streak++;if(G.streak%10===0)xuAdd(XU.s10,`Chuỗi ${G.streak} câu đúng liên tiếp!`);else if(G.streak%5===0)xuAdd(XU.s5,`Chuỗi ${G.streak} câu đúng liên tiếp!`)}
+    if(tries===0){xuAdd(XU.first,'Đúng ngay lần đầu');G.streak++;G.maxStreak=Math.max(G.maxStreak||0,G.streak);if(G.streak%10===0)xuAdd(XU.s10,`Chuỗi ${G.streak} câu đúng liên tiếp!`);else if(G.streak%5===0)xuAdd(XU.s5,`Chuỗi ${G.streak} câu đúng liên tiếp!`)}
     else{xuAdd(tries===1?XU.second:XU.later,tries===1?'Đúng ở lần thử thứ hai':'Đúng sau nhiều lần thử');G.streak=0}}
-  else if(m.k==='bad'){G.since++;xuAdd(XU.wrong,G.streak>=2?'Trả lời sai, mất chuỗi':'Trả lời sai');G.streak=0}
-  else if(m.k==='weak'){G.since++;if(G.streak>=2)toast(0,'Gần đúng, mất chuỗi');G.streak=0}
+  else if(m.k==='bad'){G.since++;markDirty();xuAdd(XU.wrong,G.streak>=2?'Trả lời sai, mất chuỗi':'Trả lời sai');G.streak=0}
+  else if(m.k==='weak'){G.since++;markDirty();if(G.streak>=2)toast(0,'Gần đúng, mất chuỗi');G.streak=0}
   const el=document.getElementById('streak');if(el)el.innerHTML=streakHtml();
 }
 function groupLines(L){const m=new Map();L.forEach(([l,n])=>{const k=l+'|'+n,o=m.get(k)||{l,n,c:0};o.c++;m.set(k,o)});return [...m.values()]}
@@ -156,7 +166,7 @@ function xuSumHtml(lines,delta,r){
   const rows=lines.map(o=>`<li><span>${esc(o.l)}${o.c>1?` × ${o.c}`:''}</span><b class="${o.n<0?'neg':''}">${o.n>0?'+':''}${o.n*o.c}</b></li>`).join('');
   const bon=r?(r.bonus||[]).map(([l,n])=>`<li class="bonus"><span>${esc(l)}</span><b>+${n}</b></li>`).join(''):'';
   const sum=delta+(r?(r.bonus||[]).reduce((a,b)=>a+b[1],0):0);
-  return `<h3>Xu của lượt này</h3><ul>${rows||'<li><span>Chưa có xu nào</span><b>0</b></li>'}${bon}</ul><p class="xu-total">${sum>=0?'+':''}${sum} xu${r&&r.total!=null?` · Tổng: ${r.total} xu`:r&&r.err?' · Chưa lưu được, kiểm tra mạng.':r?'':' · Đang lưu…'}</p>${isStudent()?'<a class="ghost sm" href="#qua">Xem kệ quà</a>':me?'':'<p class="fine">Nhập mã học sinh ở trang chủ để được đổi quà.</p>'}`;
+  return `<h3>Xu của lượt này</h3><ul>${rows||'<li><span>Chưa có xu nào</span><b>0</b></li>'}${bon}</ul><p class="xu-total">${sum>=0?'+':''}${sum} xu${r&&r.total!=null?` · Tổng: ${r.total} xu`:r&&r.err?' · Chưa lưu được, kiểm tra mạng.':r?'':' · Đang lưu…'}</p>${r&&r.badges&&r.badges.length?`<p class="newb">Huy hiệu mới: ${r.badges.map(esc).join(', ')}</p>`:''}${isStudent()?'<a class="ghost sm" href="#qua">Xem kệ quà</a> <a class="ghost sm" href="#huy-hieu">Xem huy hiệu</a>':me?'':'<p class="fine">Nhập mã học sinh ở trang chủ để được đổi quà.</p>'}`;
 }
 function renderEnd(){
   if(G.endHtml){$app.innerHTML=G.endHtml;return}
@@ -178,7 +188,7 @@ const opt=(label,ok,why)=>({label,ok,why});
 const pt=o=>`<span class="pt ${o.ok===true?'good':o.ok==='weak'?'weak':'bad'}">${o.label}</span>`;
 const BLANK='<span class="blank">?</span>';
 function resetQuiz(){G.sel=null;G.tried=[];G.done=false;G.msg=null}
-function quiz(id,map){G.qs=pick(rows(id),QUIZ_N).map(map);resetQuiz()}
+function quiz(id,map){G.qs=pick(rows(id).map((r,ix)=>[r,ix]),QUIZ_N).map(([r,ix])=>Object.assign(map(r),{key:ix}));resetQuiz()}
 function renderQuiz(){
   if(G.i>=G.qs.length)return renderEnd();
   const q=G.qs[G.i],sel=G.sel!=null?q.options[G.sel]:null;
@@ -202,7 +212,7 @@ const BUILD={};
 /* ---------- Cây câu ---------- */
 const SL={t:{q:'Khi nào?',ph:'khi nào',c:'time'},p:{q:'Ở đâu?',ph:'ở đâu',c:'place'},m:{q:'Như thế nào?',ph:'như thế nào',c:'manner'},r:{q:'Để làm gì? Vì sao?',ph:'để làm gì',c:'reason'}};
 BUILD['cay-cau']=()=>{
-  G.rounds=pick(rows('cay-cau'),PER['cay-cau']).map(([core,t,p,m,r])=>{
+  G.rounds=pickK(rows('cay-cau'),PER['cay-cau']).map(([core,t,p,m,r])=>{
     const src={t:t.split(';'),p:p.split(';'),m:m.split(';'),r:r.split(';')},opts={};
     for(const s of ['t','p','m','r']){
       const others=['t','p','m','r'].filter(x=>x!==s);let d,o,n=0;
@@ -247,7 +257,7 @@ BUILD['cay-cau']=()=>{
 const KINDS={time:{n:'Thời gian',c:'time',q:'Khi nào?'},place:{n:'Nơi chốn',c:'place',q:'Ở đâu?'},cause:{n:'Nguyên nhân',c:'reason',q:'Vì sao? Nhờ đâu?'},purpose:{n:'Mục đích',c:'purpose',q:'Để làm gì?'},means:{n:'Phương tiện',c:'manner',q:'Bằng gì? Với cái gì?'}};
 const KLET={T:'time',P:'place',N:'cause',D:'purpose',C:'means',_:null};
 BUILD['tau-chu']=()=>{
-  G.trains=pick(bank('tau-chu'),PER['tau-chu']).map(s=>s.split('|').map(x=>[x.slice(2),KLET[x[0]]]));
+  G.trains=pickK(bank('tau-chu'),PER['tau-chu']).map(s=>s.split('|').map(x=>[x.slice(2),KLET[x[0]]]));
   G.n=G.trains.length;G.k=0;G.tried=[];
   G.view=()=>{
     if(G.i>=G.n)return renderEnd();
@@ -274,7 +284,7 @@ BUILD['tau-chu']=()=>{
 const ROLES={tn:{n:'trạng ngữ',c:'time',ab:'TN',h:'Trạng ngữ là phần phụ, thường đứng đầu câu và ngăn cách với phần chính bằng dấu phẩy.'},cn:{n:'chủ ngữ',c:'purpose',ab:'CN',h:'Chủ ngữ trả lời câu hỏi Ai? Cái gì? Con gì?'},vn:{n:'vị ngữ',c:'place',ab:'VN',h:'Vị ngữ trả lời câu hỏi Làm gì? Thế nào? Là gì?'}};
 const PHASES=['tn','cn','vn'],RLET={t:'tn',c:'cn',v:'vn'};
 BUILD['tham-tu']=()=>{
-  G.sents=pick(bank('tham-tu'),PER['tham-tu']).map(s=>s.split('|').map(x=>[x.slice(2),RLET[x[0]]]));
+  G.sents=pickK(bank('tham-tu'),PER['tham-tu']).map(s=>s.split('|').map(x=>[x.slice(2),RLET[x[0]]]));
   G.n=G.sents.length;G.ph=0;G.tried=[];
   G.view=()=>{
     if(G.i>=G.n)return renderEnd();
@@ -339,7 +349,7 @@ BUILD['cam-thu']=()=>quiz('cam-thu',([lines,by,q,r,wr,w1,y1,w2,y2])=>({intro:'<p
 
 /* ---------- Nối đôi bạn thân ---------- */
 BUILD['noi-doi']=()=>{
-  G.sets=pick(bank('noi-doi'),PER['noi-doi']).map(s=>s.split(';').map(p=>p.split('=')));
+  G.sets=pickK(bank('noi-doi'),PER['noi-doi']).map(s=>s.split(';').map(p=>p.split('=')));
   G.n=G.sets.length;
   const init=()=>{const m=(G.sets[G.i]||[]).length;G.left=shuffle([...Array(m).keys()]);G.right=shuffle([...Array(m).keys()]);G.selL=null;G.matched=[];G.miss=[]};init();
   G.view=()=>{
@@ -383,7 +393,7 @@ BUILD['thanh-ngu']=()=>quiz('thanh-ngu',([text,ans,mean,d1,d2])=>{
 
 /* ---------- Xếp đoạn văn ---------- */
 BUILD['xep-doan']=()=>{
-  G.paras=pick(rows('xep-doan'),PER['xep-doan']).map(([topic,...s])=>({topic,s}));
+  G.paras=pickK(rows('xep-doan'),PER['xep-doan']).map(([topic,...s])=>({topic,s}));
   G.n=G.paras.length;
   const init=()=>{if(G.i<G.n)G.order=shuffle(G.paras[G.i].s.map((_,j)=>j));G.placed=[];G.miss=false};init();
   G.view=()=>{
@@ -485,7 +495,7 @@ function renderEssays(){
 const WK={n:{n:'Danh từ',c:'place',h:'Danh từ chỉ sự vật: người, con vật, đồ vật, cây cối, hiện tượng, khái niệm.'},v:{n:'Động từ',c:'time',h:'Động từ chỉ hoạt động, trạng thái; thường đi sau “đã, đang, sẽ”.'},t:{n:'Tính từ',c:'manner',h:'Tính từ chỉ đặc điểm, tính chất như màu sắc, hình dáng, tính nết; thường đi sau “rất”.'},r:{n:'Đại từ',c:'purpose',h:'Đại từ dùng để xưng hô (tôi, chúng em, nó, họ), để hỏi (ai, gì, đâu) hoặc để thay thế.'}};
 const parseTags=s=>{const out=[];let last=0;s.replace(/\{([^|}]+)\|([nvtr])\}/g,(m,w,k,i)=>{if(i>last)out.push({x:s.slice(last,i)});out.push({w,k});last=i+m.length;return m});if(last<s.length)out.push({x:s.slice(last)});return out};
 BUILD['phan-loai']=()=>{
-  G.sents=pick(bank('phan-loai'),PER['phan-loai']).map(parseTags);G.n=G.sents.length;
+  G.sents=pickK(bank('phan-loai'),PER['phan-loai']).map(parseTags);G.n=G.sents.length;
   const reset=()=>{G.sel=null;G.placed={};G.miss={};G.msg=null};reset();
   G.view=()=>{
     if(G.i>=G.n)return renderEnd();
@@ -516,19 +526,20 @@ BUILD['nhieu-nghia']=()=>{
     qs.push({intro:`<p class="ask">Từ <b>“${w}”</b> trong câu dưới đây mang nghĩa gốc hay nghĩa chuyển?</p>`,
       options:[opt('Nghĩa gốc',a==='g',a==='g'?`Đây là nghĩa gốc của “${w}”: ${gloss}.`:`Nghĩa gốc của “${w}” là ${gloss}. Ở câu này, từ đã chuyển sang chỉ sự vật khác có nét giống.`),
                opt('Nghĩa chuyển',a==='c',a==='c'?`Đây là nghĩa chuyển: từ nghĩa gốc (${gloss}) chuyển sang chỉ sự vật khác có nét giống.`:`Ở câu này, “${w}” dùng đúng nghĩa gốc: ${gloss}.`)],
-      view:()=>hl(sent)})})});
+      view:()=>hl(sent),key:all.indexOf(s)})})});
   pick(pairs,2).forEach(s=>{const [,two,a,why]=s.split('|');
     qs.push({intro:'<p class="ask">Hai từ được tô màu là từ nhiều nghĩa hay từ đồng âm?</p>',
       options:[opt('Từ nhiều nghĩa',a==='nn',a==='nn'?why:'Thử nghĩ: hai nghĩa này có liên quan gì với nhau không?'),opt('Từ đồng âm',a==='da',a==='da'?why:'Hai nghĩa này có nét liên quan với nhau, hãy nghĩ lại.')],
-      view:()=>two.split(' / ').map(hl).join('<br>')})});
+      view:()=>two.split(' / ').map(hl).join('<br>'),key:all.indexOf(s)})});
   G.qs=qs;resetQuiz();
 };
 
 /* ---------- Cặp từ đối đầu ---------- */
 BUILD['cap-tu']=()=>{
-  const all=rows('cap-tu'),pairs=all.filter(r=>r[0]!=='T'),tones=all.filter(r=>r[0]==='T');
-  G.items=[...pick(pairs,4).map(([w,s,a,d])=>({type:'p',w,s,a,chips:shuffle([s,a,...d.split(',')])})),
-    ...pick(tones,2).map(([,sent,r,why,w1,y1,w2,y2])=>({type:'t',sent,ans:r,chips:shuffle([r,w1,w2]),why:{[r]:why,[w1]:y1,[w2]:y2}}))];
+  const all=rows('cap-tu').map((r,ix)=>Object.assign(r,{ix})),pairs=all.filter(r=>r[0]!=='T'),tones=all.filter(r=>r[0]==='T');
+  const pp=pick(pairs,4),tt=pick(tones,2);G.rowKeys=[...pp,...tt].map(r=>r.ix);
+  G.items=[...pp.map(([w,s,a,d])=>({type:'p',w,s,a,chips:shuffle([s,a,...d.split(',')])})),
+    ...tt.map(([,sent,r,why,w1,y1,w2,y2])=>({type:'t',sent,ans:r,chips:shuffle([r,w1,w2]),why:{[r]:why,[w1]:y1,[w2]:y2}}))];
   G.n=G.items.length;const reset=()=>{G.got={};G.bad=[];G.missed=false;G.msg=null};reset();
   G.view=()=>{
     if(G.i>=G.n)return renderEnd();
@@ -558,7 +569,7 @@ BUILD['cap-tu']=()=>{
 
 /* ---------- Thợ săn chính tả ---------- */
 BUILD['chinh-ta']=()=>{
-  G.items=pick(rows('chinh-ta'),PER['chinh-ta']).map(([s,tip,d])=>{
+  G.items=pickK(rows('chinh-ta'),PER['chinh-ta']).map(([s,tip,d])=>{
     const m=/\{([^>}]+)>([^}]+)\}/.exec(s),pre=s.slice(0,m.index),post=s.slice(m.index+m[0].length),sp=t=>t.split(/(\s+)/).filter(x=>x).map(x=>({x}));
     return {toks:[...sp(pre),{x:m[1],bad:true},...sp(post)],wrong:m[1],right:m[2],tip,opts:shuffle([m[2],m[1],d])};
   });
@@ -594,7 +605,7 @@ const MARKS=['.',',','?','!',':',';','–','“','”','(',')'];
 const MHINT={'.':'Dấu chấm đặt cuối câu kể.',',':'Dấu phẩy ngăn trạng ngữ với chủ ngữ – vị ngữ, ngăn các từ cùng loại, ngăn các vế câu ghép, hoặc đặt sau từ cảm thán.','?':'Dấu chấm hỏi đặt cuối câu hỏi.','!':'Dấu chấm than đặt cuối câu cảm hoặc câu khiến.',':':'Dấu hai chấm báo hiệu phần liệt kê, giải thích hoặc lời nói trực tiếp đứng sau.',';':'Dấu chấm phẩy ngăn các vế câu ghép có cấu tạo giống nhau.','–':'Dấu gạch ngang đánh dấu phần chú thích hoặc nối các tên trong một liên danh.','“':'Dấu ngoặc kép mở đầu lời nói trực tiếp hoặc tên tác phẩm.','”':'Dấu ngoặc kép đóng lại lời nói trực tiếp hoặc tên tác phẩm.','(':'Dấu ngoặc đơn mở đầu phần chú thích.',')':'Dấu ngoặc đơn đóng lại phần chú thích.'};
 const KIEU={ke:['Câu kể','Câu kể dùng để kể, tả, giới thiệu; cuối câu thường có dấu chấm.'],hoi:['Câu hỏi','Câu hỏi dùng để hỏi điều chưa biết; cuối câu có dấu chấm hỏi.'],cam:['Câu cảm','Câu cảm bộc lộ cảm xúc, thường có “ôi, chà, trời ơi…”; cuối câu có dấu chấm than.'],khien:['Câu khiến','Câu khiến dùng để yêu cầu, đề nghị, khuyên bảo, thường có “hãy, đừng, nhé, đi, thôi”.']};
 BUILD['dau-cau']=()=>{
-  G.items=pick(rows('dau-cau'),PER['dau-cau']).map(([s,kind])=>{const parts=[];let last=0;s.replace(/\{([^}]+)\}/g,(m,mk,i)=>{parts.push({x:s.slice(last,i)});parts.push({m:mk});last=i+m.length;return m});parts.push({x:s.slice(last)});return {parts,kind}});
+  G.items=pickK(rows('dau-cau'),PER['dau-cau']).map(([s,kind])=>{const parts=[];let last=0;s.replace(/\{([^}]+)\}/g,(m,mk,i)=>{parts.push({x:s.slice(last,i)});parts.push({m:mk});last=i+m.length;return m});parts.push({x:s.slice(last)});return {parts,kind}});
   G.n=G.items.length;const reset=()=>{G.k=0;G.missed=false;G.kdone=false;G.tried=[];G.msg=null};reset();
   G.view=()=>{
     if(G.i>=G.n)return renderEnd();
@@ -628,8 +639,8 @@ BUILD['dau-cau']=()=>{
 const READ_MISS='Đọc lại đoạn văn và tìm chi tiết liên quan nhé.';
 BUILD['doc-hieu']=()=>{
   const qs=[];
-  pick(rows('doc-hieu'),PER['doc-hieu']).forEach(([p,by,qq])=>{const qa=qq.split('#');qa.forEach((q,n)=>{const [qt,r,why,w1,w2]=q.split('~');
-    qs.push({intro:`<p class="ask">Đọc kĩ đoạn văn rồi trả lời câu hỏi ${n+1}/${qa.length}.</p>`,col:true,
+  pick(rows('doc-hieu').map((r,ix)=>Object.assign(r,{ix})),PER['doc-hieu']).forEach(row=>{const [p,by,qq]=row,qa=qq.split('#');qa.forEach((q,n)=>{const [qt,r,why,w1,w2]=q.split('~');
+    qs.push({key:row.ix,intro:`<p class="ask">Đọc kĩ đoạn văn rồi trả lời câu hỏi ${n+1}/${qa.length}.</p>`,col:true,
       options:shuffle([opt(r,true,why),opt(w1,false,READ_MISS),opt(w2,false,READ_MISS)]),
       view:()=>`<div class="poem passage">${esc(p).split('/').join('<br>')}${by?`<div class="by">${esc(by)}</div>`:''}<div class="q">${esc(qt)}</div></div>`})})});
   G.qs=qs;resetQuiz();
@@ -659,9 +670,9 @@ async function renderDash(h){
 function tableStudents(S){
   const act=S.filter(s=>s.active);
   if(!act.length)return `<div class="board"><p>Chưa có học sinh nào. Thêm học sinh trong <a href="${ENG_APP}" target="_blank" rel="noopener">app tiếng Anh</a>, mã sẽ tự có ở đây.</p></div>`;
-  return `<div class="tablewrap"><table class="dt"><thead><tr><th>Học sinh</th>${ISLANDS.map((x,k)=>`<th class="c${k}"><span class="isle-dot"></span>${shortIsl(k)}</th>`).join('')}<th>Sao</th><th>Xu</th><th>Chơi gần nhất</th></tr></thead><tbody>
+  return `<div class="tablewrap"><table class="dt"><thead><tr><th>Học sinh</th>${ISLANDS.map((x,k)=>`<th class="c${k}"><span class="isle-dot"></span>${shortIsl(k)}</th>`).join('')}<th>Sao</th><th>Xu</th><th>Huy hiệu</th><th>Chơi gần nhất</th></tr></thead><tbody>
     ${act.map(s=>{const p=islPct(s.best),t=p.reduce((a,x)=>a+x.got,0),w=s.essays.filter(e=>!e.comment).length;
-      return `<tr class="link" data-act="d-open" data-code="${esc(s.code)}" tabindex="0"><td><b>${esc(s.name)}</b>${w?` <span class="badge" title="Bài chờ nhận xét">${w}</span>`:''}<br><span class="fine">${esc(s.code)}</span></td>${p.map(x=>`<td class="c${x.k}"><div class="pbar"><i style="width:${Math.round(x.got/x.max*100)}%"></i></div><span class="fine">${x.got}/${x.max}</span></td>`).join('')}<td><b>${t}</b>/${GAMES.length*3}</td><td>${s.xu.total}${(s.xu.req||[]).some(r=>r.status==='pending')?' <span class="badge soft">xin quà</span>':''}</td><td>${fmtDate(s.updated)}</td></tr>`}).join('')}
+      return `<tr class="link" data-act="d-open" data-code="${esc(s.code)}" tabindex="0"><td><b>${esc(s.name)}</b>${w?` <span class="badge" title="Bài chờ nhận xét">${w}</span>`:''}<br><span class="fine">${esc(s.code)}</span></td>${p.map(x=>`<td class="c${x.k}"><div class="pbar"><i style="width:${Math.round(x.got/x.max*100)}%"></i></div><span class="fine">${x.got}/${x.max}</span></td>`).join('')}<td><b>${t}</b>/${GAMES.length*3}</td><td>${vn(s.xu.total)}${(s.xu.req||[]).some(r=>r.status==='pending')?' <span class="badge soft">xin quà</span>':''}</td><td>${badgeList(s.xu,s.essays).filter(b=>b.ok).length}</td><td>${fmtDate(s.updated)}</td></tr>`}).join('')}
     </tbody></table></div><p class="fine">Bấm vào một học sinh để xem từng trò chơi, bài thi thử, xu và quà.</p>`;
 }
 function essayFeed(S){
@@ -698,35 +709,37 @@ function renderKid(st,o){
       ${weak.length?`<div class="msg weak"><b>Chưa đạt 2 sao:</b><span>${weak.join(', ')}.</span></div>`:'<div class="msg ok"><b>Tuyệt vời!</b><span>Bé đã đạt từ 2 sao trở lên ở mọi trò chơi.</span></div>'}
       <div class="islands">${MIXED.map(g=>`<div class="island tinted c${g.is} mini"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3>${stars(st.best[g.id]||0)}</div>`).join('')}</div></div>
     <h2 class="sec">Xu và quà</h2><div class="board">${shelfHtml(st.xu,{code:st.code,canDecide:!!o.canGift})}${o.canGift?giftEditor(st):''}</div>
+    <h2 class="sec">Huy hiệu</h2><div class="board">${badgePanel(st.xu,st.essays)}</div>
     <h2 class="sec">Bài thi thử đã nộp (${st.essays.length})</h2>
     ${st.essays.length?st.essays.map(e=>essayCard(st,e,o.canComment)).join(''):'<p class="fine">Chưa có bài nào.</p>'}`;
   window.scrollTo(0,0);
 }
-function giftState(g,x){const r=(x.req||[]).filter(q=>q.m===g.m).slice(-1)[0];if(r&&r.status==='given')return 'given';if(r&&r.status==='pending')return 'pending';if((x.peak||0)>=g.m)return r&&r.status==='refused'?'refused':'open';return 'locked'}
+function giftState(g,x){if((x.req||[]).some(q=>q.m===g.m&&q.status==='pending'))return 'pending';return (x.total||0)>=g.m?'open':'locked'}
+const vn=n=>Number(n||0).toLocaleString('vi-VN');
 function shelfHtml(x,o){
-  x=x||{};const gifts=x.gifts||[],peak=x.peak||0,nextG=gifts.find(g=>peak<g.m),prevG=[...gifts].reverse().find(g=>peak>=g.m),base=prevG?prevG.m:0;
-  const pct=nextG?Math.max(0,Math.min(100,Math.round((peak-base)/(nextG.m-base)*100))):100;
-  return `<div class="xu-head">${COIN}<b>${x.total||0}</b> xu<span class="fine">Cao nhất từng đạt: ${peak} xu${x.streak?` · chơi liên tục ${x.streak} ngày`:''}</span></div>
-    ${nextG?`<div class="meter-row"><span>Còn ${nextG.m-peak} xu nữa tới mốc ${nextG.m}</span><div class="meter"><div style="width:${pct}%"></div></div></div>`:gifts.length?'<p class="fine">Đã mở khóa tất cả các mốc quà!</p>':''}
-    <div class="gifts">${gifts.map(g=>{const s=giftState(g,x),req=(x.req||[]).filter(q=>q.m===g.m&&q.status==='pending').slice(-1)[0];
-      const act=o.student?(s==='open'||s==='refused'?`<button class="primary sm" data-act="g-req" data-m="${g.m}">Xin đổi quà</button>`:'')
-        :(o.canDecide&&req?`<div class="actions"><button class="primary sm" data-act="g-ok" data-code="${esc(o.code)}" data-id="${esc(req.id)}">Đã trao quà</button><button class="ghost sm" data-act="g-no" data-code="${esc(o.code)}" data-id="${esc(req.id)}">Chưa đồng ý</button></div>`:'');
-      const lab={given:'Đã nhận quà',pending:'Đang chờ người lớn duyệt',refused:'Lần trước chưa được đồng ý',open:'Đã đủ xu',locked:'Chưa đủ xu'}[s];
-      return `<div class="gift ${s}"><b>${g.m.toLocaleString('vi-VN')} xu</b><span>${esc(g.name)}</span><span class="fine">${lab}</span>${act}</div>`}).join('')}</div>`;
+  x=x||{};const gifts=x.gifts||[],tot=x.total||0,nextG=gifts.find(g=>tot<g.m),prevG=[...gifts].reverse().find(g=>tot>=g.m),base=prevG?prevG.m:0;
+  const pct=nextG?Math.max(0,Math.min(100,Math.round((tot-base)/(nextG.m-base)*100))):100;
+  return `<div class="xu-head">${COIN}<b>${vn(tot)}</b> xu${x.streak?`<span class="fine">Chơi liên tục ${x.streak} ngày</span>`:''}</div>
+    ${nextG?`<div class="meter-row"><span>Còn ${vn(nextG.m-tot)} xu nữa tới mốc ${vn(nextG.m)}</span><div class="meter"><div style="width:${pct}%"></div></div></div>`:gifts.length?'<p class="fine">Đã đủ xu cho mọi mốc quà!</p>':''}
+    <div class="gifts">${gifts.map(g=>{const s=giftState(g,x),req=(x.req||[]).filter(q=>q.m===g.m&&q.status==='pending').slice(-1)[0],times=(x.req||[]).filter(q=>q.m===g.m&&q.status==='given').length;
+      const act=o.student?(s==='open'?`<button class="primary sm" data-act="g-req" data-m="${g.m}">Đổi ngay</button>`:'')
+        :(o.canDecide&&req?`<div class="actions"><button class="primary sm" data-act="g-ok" data-code="${esc(o.code)}" data-id="${esc(req.id)}">Đã trao quà</button><button class="ghost sm" data-act="g-no" data-code="${esc(o.code)}" data-id="${esc(req.id)}">Chưa đồng ý, trả lại xu</button></div>`:'');
+      const lab={pending:'Đang chờ người lớn duyệt (đã tạm trừ xu)',open:o.student?'Đủ xu: đổi ngay hoặc tích tiếp':'Bé đã đủ xu',locked:`Còn thiếu ${vn(g.m-tot)} xu`}[s];
+      return `<div class="gift ${s}"><b>${vn(g.m)} xu</b><span>${esc(g.name)}</span><span class="fine">${lab}${times?` · đã đổi ${times} lần`:''}</span>${act}</div>`}).join('')}</div>`;
 }
 function renderShelf(){
   G=null;
   if(!isStudent()){$app.innerHTML='<div class="board"><p>Kệ quà dành cho học sinh đã nhập mã. Hãy nhập mã ở trang chủ.</p><div class="actions"><a class="primary" href="#">Về trang chủ</a></div></div>';return}
   $app.innerHTML=`<div class="bar"><a class="back" href="#">← Bản đồ</a><div class="gtitle">Kệ quà của ${esc(me.name)}</div></div>
     <div class="board">${shelfHtml(xu,{student:true})}<div id="shelfmsg" role="status"></div>
-    <p class="fine">Mỗi câu đúng ngay lần đầu được 10 xu, trả lời sai bị trừ 5 xu, đúng liên tiếp 5 câu được thưởng 20 xu. Đủ xu tới mốc nào thì bấm “Xin đổi quà”, bố mẹ hoặc thầy cô sẽ duyệt và trao quà cho em. Đổi quà không làm mất xu.</p></div>`;
+    <p class="fine">Mỗi câu đúng ngay lần đầu được 10 xu, trả lời sai bị trừ 2 xu. Đúng liên tiếp 5 câu được thưởng thêm 50 xu, 10 câu được thưởng thêm 100 xu. Đủ xu tới mốc nào, em có thể đổi ngay hoặc tích tiếp để đổi quà to hơn. Đổi quà sẽ trừ đúng số xu của mốc đó; nếu bố mẹ hay thầy cô chưa đồng ý thì xu được trả lại.</p></div>`;
 }
 function giftFeed(S){
   const all=[];S.forEach(s=>(s.xu.req||[]).forEach(r=>all.push({s,r})));
   const pend=all.filter(x=>x.r.status==='pending'),done=all.filter(x=>x.r.status!=='pending').sort((a,b)=>(b.r.doneAt||'')>(a.r.doneAt||'')?1:-1).slice(0,10);
   const row=({s,r})=>`<div class="board grq"><div><b>${esc(s.name)}</b> <span class="fine">${esc(s.code)} · ${fmtDate(r.at)}</span><br>Xin đổi: <b>${esc(r.name)}</b> (mốc ${r.m} xu)</div>
     ${r.status==='pending'?`<div class="actions"><button class="primary sm" data-act="g-ok" data-code="${esc(s.code)}" data-id="${esc(r.id)}">Đã trao quà</button><button class="ghost sm" data-act="g-no" data-code="${esc(s.code)}" data-id="${esc(r.id)}">Chưa đồng ý</button></div>`
-    :`<span class="fine">${r.status==='given'?'Đã trao':'Chưa đồng ý'} · ${esc(r.by||'')}</span>`}</div>`;
+    :`<span class="fine">${r.status==='given'?'Đã trao':'Chưa đồng ý, đã trả lại xu'} · ${esc(r.by||'')}</span>`}</div>`;
   return (pend.length?pend.map(row).join(''):'<div class="board"><p>Không có yêu cầu đổi quà nào đang chờ.</p></div>')+(done.length?'<h2 class="sec">Đã xử lí gần đây</h2>'+done.map(row).join(''):'');
 }
 function giftEditor(st){
@@ -737,7 +750,9 @@ function giftEditor(st){
     <p class="fine">Dòng nào để trống sẽ bị bỏ qua. Xóa hết rồi lưu thì quay về danh sách quà mặc định.</p></form></details>`;
 }
 async function giftAct(a,b){
-  if(a==='g-req'){const msg=document.getElementById('shelfmsg');try{const d=await call('gift.request',{m:+b.dataset.m});xu=d.xu;renderShelf();const m2=document.getElementById('shelfmsg');if(m2)m2.innerHTML='<div class="msg ok"><b>Đã gửi!</b><span>Bố mẹ hoặc thầy cô sẽ duyệt yêu cầu đổi quà của em.</span></div>'}catch(e){if(msg)msg.innerHTML=`<div class="msg bad"><b>Chưa gửi được.</b><span>${esc(e.message)}</span></div>`}return}
+  if(a==='g-req'){const msg=document.getElementById('shelfmsg');
+    if(b.dataset.sure!=='1'){b.dataset.sure='1';b.textContent=`Bấm lần nữa: trừ ${vn(b.dataset.m)} xu`;return}
+    try{const d=await call('gift.request',{m:+b.dataset.m});xu=d.xu;renderShelf();const m2=document.getElementById('shelfmsg');if(m2)m2.innerHTML='<div class="msg ok"><b>Đã gửi!</b><span>Bố mẹ hoặc thầy cô sẽ duyệt yêu cầu đổi quà của em.</span></div>'}catch(e){if(msg)msg.innerHTML=`<div class="msg bad"><b>Chưa gửi được.</b><span>${esc(e.message)}</span></div>`}return}
   try{const d=await call('gift.decide',{code:b.dataset.code,id:b.dataset.id,ok:a==='g-ok'});const st=DASH&&DASH.students.find(s=>s.code===b.dataset.code);if(st)st.xu=d.xu;renderDash(location.hash.slice(1)||'theo-doi')}
   catch(e){b.textContent=e.message}
 }
@@ -746,6 +761,44 @@ async function saveGifts(f){
   for(let i=0;i<10;i++){const m=f.elements['m'+i],n=f.elements['n'+i];if(!m||!n)break;if(m.value&&n.value.trim())gifts.push({m:+m.value,name:n.value.trim()})}
   try{const d=await call('gift.set',{code:f.dataset.code,gifts});const st=DASH&&DASH.students.find(s=>s.code===f.dataset.code);if(st)st.xu=d.xu;renderDash(location.hash.slice(1)||'theo-doi')}
   catch(e){msg.textContent=e.message}
+}
+/* ---------- Huy hiệu ---------- */
+const MEDAL='<svg class="medal-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h8l-2.5 6h-3z"/><circle cx="12" cy="15" r="6"/></svg>';
+const LOCK='<svg class="medal-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+const TIERS=[['dong','Đồng',.4],['bac','Bạc',.7],['vang','Vàng',1]];
+const GAMEB=()=>GAMES.filter(g=>g.id!=='thi-thu');
+function badgeList(x,ess){
+  const st=(x&&x.stats)||{},sv=st.solved||{},E=ess||[],out=[];
+  for(const g of GAMEB()){const n=bank(g.id).length,got=(sv[g.id]||[]).length;
+    TIERS.forEach(([k,name,p])=>{const need=Math.ceil(n*p);out.push({id:g.id+'-'+k,grp:'Bộ câu hỏi',tier:k,isl:g.is,name:name+' · '+g.name,how:`Trả lời đúng ngay lần đầu ${need}/${n} câu khác nhau của trò ${g.name}.`,have:Math.min(got,need),need,ok:got>=need})})}
+  ISLANDS.forEach((isl,k)=>{const gs=GAMEB().filter(g=>g.is===k),has=tier=>gs.filter(g=>out.find(b=>b.id===g.id+'-'+tier).ok).length;
+    out.push({id:'isl'+k+'-1',grp:'Đảo',tier:'bac',isl:k,name:'Nhà thám hiểm '+isl.name,how:`Có huy hiệu Đồng ở cả ${gs.length} trò của ${isl.name}.`,have:has('dong'),need:gs.length,ok:has('dong')===gs.length});
+    out.push({id:'isl'+k+'-2',grp:'Đảo',tier:'vang',isl:k,name:'Chúa đảo '+isl.name.replace('Đảo ',''),how:`Có huy hiệu Vàng ở cả ${gs.length} trò của ${isl.name}.`,have:has('vang'),need:gs.length,ok:has('vang')===gs.length})});
+  const ms=st.maxStreak||0;[[10,'Ngọn lửa nhỏ'],[20,'Ngọn lửa lớn'],[30,'Ngọn lửa bất diệt']].forEach(([n,name],i)=>out.push({id:'streak'+n,grp:'Chuỗi đúng',tier:TIERS[i][0],name,how:`Đúng liên tiếp ${n} câu trong một lượt chơi.`,have:Math.min(ms,n),need:n,ok:ms>=n}));
+  out.push({id:'perfect5',grp:'Hoàn hảo',tier:'vang',name:'Không một lỗi',how:'Có 5 lượt chơi đúng hết ngay lần đầu.',have:Math.min(st.perfect||0,5),need:5,ok:(st.perfect||0)>=5});
+  const bd=st.bestDays||0;[[7,'Chăm học 7 ngày','bac'],[30,'Chăm học 30 ngày','vang']].forEach(([n,name,tier])=>out.push({id:'days'+n,grp:'Chăm chỉ',tier,name,how:`Chơi liên tục ${n} ngày.`,have:Math.min(bd,n),need:n,ok:bd>=n}));
+  const sub=E.length,full=E.filter(e=>e.stars===3).length,cm=E.filter(e=>e.comment).length;
+  out.push({id:'write5',grp:'Viết văn',tier:'dong',name:'Cây bút nhỏ',how:'Nộp 5 bài thi thử.',have:Math.min(sub,5),need:5,ok:sub>=5});
+  out.push({id:'praised',grp:'Viết văn',tier:'bac',name:'Được cô khen',how:'Có 3 bài thi thử được thầy cô nhận xét.',have:Math.min(cm,3),need:3,ok:cm>=3});
+  out.push({id:'write3s',grp:'Viết văn',tier:'vang',name:'Cây bút vàng',how:'Có 5 bài thi thử đạt đủ yêu cầu của đề.',have:Math.min(full,5),need:5,ok:full>=5});
+  const kings=out.filter(b=>/^isl\d-2$/.test(b.id)&&b.ok).length;
+  out.push({id:'king',grp:'Tối thượng',tier:'vang',name:'Vua Đảo Câu Văn',how:'Có đủ 5 huy hiệu Chúa đảo.',have:kings,need:5,ok:kings>=5});
+  return out;
+}
+function badgeHtml(b){return `<div class="bdg ${b.ok?'on':'off'} t-${b.tier}"><span class="medal">${b.ok?MEDAL:LOCK}</span><b>${esc(b.name)}</b><span class="fine">${esc(b.how)}</span>${b.ok?'<span class="fine got">Đã mở khóa</span>':`<div class="meter sm"><div style="width:${Math.round(b.have/b.need*100)}%"></div></div><span class="fine">${b.have}/${b.need}</span>`}</div>`}
+function gameBadgeCard(g,sv){const n=bank(g.id).length,got=(sv[g.id]||[]).length;
+  return `<div class="gbdg c${g.is}"><b>${g.name}</b><div class="meter sm"><div style="width:${Math.round(got/n*100)}%"></div></div><span class="fine">${got}/${n} câu đã chinh phục</span><span class="pips">${TIERS.map(([k,name,p])=>`<span class="pip t-${k}${got>=Math.ceil(n*p)?' on':''}" title="${name}: ${Math.ceil(n*p)} câu">${name}</span>`).join('')}</span></div>`}
+function badgePanel(x,ess){
+  const L=badgeList(x,ess),sv=((x&&x.stats)||{}).solved||{};
+  return `<p class="bsum">${MEDAL}<b>${L.filter(b=>b.ok).length}</b>/${L.length} huy hiệu</p>
+    <h3 class="bgrp">Bộ câu hỏi</h3><p class="fine">Mỗi câu chỉ tính một lần, khi trả lời đúng ngay lần đầu (trò nhiều bước: đúng hết các bước). Đồng: 40% số câu của trò, Bạc: 70%, Vàng: tất cả.</p>
+    <div class="gbdgs">${GAMEB().map(g=>gameBadgeCard(g,sv)).join('')}</div>
+    ${[...new Set(L.filter(b=>b.grp!=='Bộ câu hỏi').map(b=>b.grp))].map(gp=>`<h3 class="bgrp">${gp}</h3><div class="bdgs">${L.filter(b=>b.grp===gp).map(badgeHtml).join('')}</div>`).join('')}`;
+}
+function renderBadges(){
+  G=null;
+  if(!isStudent()){$app.innerHTML='<div class="board"><p>Bộ sưu tập huy hiệu dành cho học sinh đã nhập mã. Hãy nhập mã ở trang chủ.</p><div class="actions"><a class="primary" href="#">Về trang chủ</a></div></div>';return}
+  $app.innerHTML=`<div class="bar"><a class="back" href="#">← Bản đồ</a><div class="gtitle">Huy hiệu của ${esc(me.name)}</div></div><div class="board">${badgePanel(xu,essays)}</div>`;
 }
 async function renderPlink(token){
   G=null;$app.innerHTML='<p class="fine">Đang tải báo cáo…</p>';
@@ -808,6 +861,7 @@ function route(){
   const h=location.hash.slice(1);
   if(h==='theo-doi'||h.startsWith('hs-'))return renderDash(h);
   if(h==='qua')return renderShelf();
+  if(h==='huy-hieu')return renderBadges();
   const g=GAMES.find(x=>x.id===h);if(g)startGame(g);else renderMap();window.scrollTo(0,0);
 }
 addEventListener('hashchange',route);

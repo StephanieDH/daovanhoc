@@ -67,12 +67,14 @@ const need = (me, roles) => { if (!me) bad('Hãy đăng nhập lại.', 401); if
 const essaysOut = es => (Array.isArray(es) ? es : []).map(e => ({ at: e.at, de: e.de, text: e.text, stars: e.stars, comment: e.comment || '', commentBy: e.commentBy || '', commentAt: e.commentAt || null }));
 // ---------- xu và quà
 const DEFAULT_GIFTS = [
-  { m: 200, name: "Huy hiệu “Thợ câu chữ”" }, { m: 500, name: "Quà nhỏ: bộ sticker hoặc bút màu" }, { m: 1000, name: "Một cuốn truyện" },
-  { m: 2000, name: "Đi chơi cuối tuần" }, { m: 5000, name: "Quà đặc biệt do bố mẹ chọn" }];
+  { m: 1000, name: "Quà nhỏ: bộ sticker hoặc bút màu" }, { m: 2000, name: "Một cuốn truyện" },
+  { m: 5000, name: "Đi chơi cuối tuần" }, { m: 10000, name: "Quà đặc biệt do bố mẹ chọn" }];
 const giftsOf = x => (Array.isArray(x && x.gifts) && x.gifts.length ? x.gifts : DEFAULT_GIFTS);
 const vnDay = (ms = Date.now()) => new Date(ms + 7 * 3600000).toISOString().slice(0, 10);
 function dayStreak(days, today) { const set = new Set(days); let n = 0, d = Date.parse(today + "T00:00:00Z"); while (set.has(new Date(d).toISOString().slice(0, 10))) { n++; d -= DAY; } return n; }
-const xuOut = x => { x = x || {}; return { total: x.total || 0, peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()) }; };
+function bestRun(days) { const s = [...new Set(days || [])].sort(); let best = 0, run = 0, prev = 0; for (const d of s) { const ms = Date.parse(d + "T00:00:00Z"); run = prev && ms - prev === DAY ? run + 1 : 1; prev = ms; best = Math.max(best, run); } return best; }
+const xuOut = x => { x = x || {}; return { total: x.total || 0, peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()),
+  stats: { solved: x.solved || {}, maxStreak: x.maxStreak || 0, perfect: x.perfect || 0, bestDays: bestRun(x.days) } }; };
 const canKid = (me, code) => me.role === "teacher" || me.role === "admin" || (me.role === "parent" && (me.kids || []).includes(code));
 function report(st, p, withLink) {
   const o = { code: st.code, name: st.name || st.code, active: !!st.active, best: (p && p.best) || {}, essays: essaysOut(p && p.essays), xu: xuOut(p && p.xu), updated: (p && p.updated_at) || null };
@@ -139,6 +141,11 @@ async function handle(req, res) {
       const s = dayStreak(x.days, today); if (s > 0 && s % 7 === 0) bonus.push([`Chơi đều ${s} ngày liên tiếp`, 100]);
     }
     x.total = Math.max(0, (x.total || 0) + delta + bonus.reduce((a, b) => a + b[1], 0)); x.peak = Math.max(x.peak || 0, x.total);
+    // thống kê cho huy hiệu: các câu (số thứ tự trong ngân hàng) đã trả lời đúng ngay lần đầu, chuỗi dài nhất, số lượt hoàn hảo
+    const sv = (Array.isArray(body.solved) ? body.solved : []).map(n => parseInt(n, 10)).filter(n => n >= 0 && n < 1000).slice(0, 50);
+    if (sv.length && game !== "thi-thu") { x.solved = { ...(x.solved || {}) }; x.solved[game] = [...new Set([...(x.solved[game] || []), ...sv])].sort((a, b) => a - b); }
+    x.maxStreak = Math.max(x.maxStreak || 0, Math.min(200, parseInt(body.maxStreak, 10) || 0));
+    if (body.perfect === true && game !== "thi-thu") x.perfect = (x.perfect || 0) + 1;
     p.xu = x; p.bonus = bonus;
     p.essays = Array.isArray(p.essays) ? p.essays : [];
     if (game === 'thi-thu' && body.essay && body.essay.text) {
@@ -151,9 +158,10 @@ async function handle(req, res) {
     const me = need(await who(req), ["student"]);
     const p = await prog(me.code), x = { ...(p.xu || {}) }, m = parseInt(body.m, 10);
     const g = giftsOf(x).find(z => z.m === m); if (!g) bad("Không có món quà này.", 404);
-    if ((x.peak || 0) < m) bad("Em chưa đủ xu để đổi món quà này.");
     x.req = Array.isArray(x.req) ? x.req : [];
-    if (x.req.some(r => r.m === m && (r.status === "pending" || r.status === "given"))) bad("Em đã xin đổi món quà này rồi.");
+    if (x.req.some(r => r.m === m && r.status === "pending")) bad("Em đã xin đổi món quà này rồi, hãy chờ người lớn duyệt.");
+    if ((x.total || 0) < m) bad("Em chưa đủ xu để đổi món quà này.");
+    x.total = (x.total || 0) - m;   // trừ xu ngay; nếu người lớn không đồng ý thì hoàn lại
     x.req.push({ id: Date.now().toString(36), m, name: g.name, at: new Date().toISOString(), status: "pending" });
     p.xu = x; await progPut(p); return out({ xu: xuOut(x) });
   }
@@ -163,6 +171,7 @@ async function handle(req, res) {
     const p = await prog(code), x = { ...(p.xu || {}) }, r = (x.req || []).find(z => z.id === String(body.id || ""));
     if (!r) bad("Không tìm thấy yêu cầu đổi quà.", 404); if (r.status !== "pending") bad("Yêu cầu này đã được xử lí.");
     r.status = body.ok ? "given" : "refused"; r.by = me.name; r.doneAt = new Date().toISOString();
+    if (!body.ok) x.total = (x.total || 0) + r.m;   // hoàn lại xu
     p.xu = x; await progPut(p); return out({ xu: xuOut(x) });
   }
   if (a === "gift.set") {
