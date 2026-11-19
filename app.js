@@ -87,8 +87,12 @@ async function saveRound(id,s,essay){
     const before=new Set(badgeList(xu,essays).filter(b=>b.ok).map(b=>b.id));
     const solved=solvedKeys(),perfect=!!(G&&G.seen&&G.seen.size&&!G.anyDirty&&id!=='thi-thu');
     try{const d=await call('save',{game:id,stars:s,essay,xu:delta,solved,maxStreak:G?G.maxStreak||0:0,perfect});essays=d.essays||essays;xu=d.xu||xu;renderTotal();if(G&&G.g.id==='thi-thu')renderEssays();
-      const fresh=badgeList(xu,essays).filter(b=>b.ok&&!before.has(b.id));fresh.forEach(b=>toast(0,'Huy hiệu mới: '+b.name));
-      return {bonus:d.bonus||[],total:xu.total,badges:fresh.map(b=>b.name)}}
+      // thưởng xu cho huy hiệu mới mở (và huy hiệu mở từ trước khi có thưởng), mỗi huy hiệu một lần
+      const now=badgeList(xu,essays),fresh=new Set(now.filter(b=>b.ok&&!before.has(b.id)).map(b=>b.id)),bonus=[...(d.bonus||[])];
+      const unpaid=now.filter(b=>b.ok&&!(xu.paid||[]).includes(b.id));
+      if(unpaid.length){try{const c=await call('badge.claim',{ids:unpaid.map(b=>b.id)});xu=c.xu||xu;renderTotal();
+        (c.got||[]).forEach(([bid,n])=>{const b=unpaid.find(z=>z.id===bid),lab=(fresh.has(bid)?'Huy hiệu mới: ':'Thưởng huy hiệu: ')+(b?b.name:bid);bonus.push([lab,n]);toast(n,lab,'badge')})}catch(e){}}
+      return {bonus,total:xu.total,badges:[]}}
     catch(e){renderTotal();return {bonus:[],total:null,err:e.message}}
   }
   xu.total=Math.max(0,(xu.total||0)+delta);xu.peak=Math.max(xu.peak||0,xu.total);LS.set('dcv-xu-guest',{total:xu.total,peak:xu.peak});renderTotal();
@@ -153,10 +157,10 @@ function next(){
   if(G.onNext)G.onNext();else{G.total++;G.i++;resetQuiz()}
   render();window.scrollTo(0,0);
 }
-function toast(n,label){
+function toast(n,label,cls){
   let box=document.getElementById('toasts');if(!box){box=document.createElement('div');box.id='toasts';box.setAttribute('aria-live','polite');document.body.appendChild(box)}
   while(box.children.length>=2)box.firstChild.remove();
-  const el=document.createElement('div');el.className='toast '+(n>0?'up':n<0?'down':'zero');el.textContent=(n>0?'+'+n+' xu · ':n<0?n+' xu · ':'')+label;box.appendChild(el);setTimeout(()=>el.remove(),2300);
+  const el=document.createElement('div');el.className='toast '+(cls||(n>0?'up':n<0?'down':'zero'));el.textContent=cls==='badge'?label+' · +'+n+' xu':(n>0?'+'+n+' xu · ':n<0?n+' xu · ':'')+label;box.appendChild(el);setTimeout(()=>el.remove(),2300);
 }
 function xuAdd(n,label,quiet){if(!G||isStaff())return;G.xu+=n;G.xuLines.push([label,n]);if(!quiet)toast(n,label);renderTotal()}
 function xuJudge(prev){
@@ -792,15 +796,16 @@ function badgeList(x,ess){
   out.push({id:'king',grp:'Tối thượng',tier:'vang',name:'Vua Đảo Câu Văn',how:'Có đủ 5 huy hiệu Chúa đảo.',have:kings,need:5,ok:kings>=5});
   return out;
 }
-function badgeHtml(b){return `<div class="bdg ${b.ok?'on':'off'} t-${b.tier}"><span class="medal">${b.ok?MEDAL:LOCK}</span><b>${esc(b.name)}</b><span class="fine">${esc(b.how)}</span>${b.ok?'<span class="fine got">Đã mở khóa</span>':`<div class="meter sm"><div style="width:${Math.round(b.have/b.need*100)}%"></div></div><span class="fine">${b.have}/${b.need}</span>`}</div>`}
+function BREWARD(id){let m=/^([a-z-]+)-(dong|bac|vang)$/.exec(id);if(m)return {dong:50,bac:100,vang:200}[m[2]];m=/^isl(\d)-([12])$/.exec(id);if(m)return m[2]==='1'?150:300;return {streak10:100,streak20:200,streak30:300,perfect5:200,days7:150,days30:300,write5:100,praised:150,write3s:200,king:1000}[id]||0}
+function badgeHtml(b,paid){const n=BREWARD(b.id);return `<div class="bdg ${b.ok?'on':'off'} t-${b.tier}"><span class="medal">${b.ok?MEDAL:LOCK}</span><b>${esc(b.name)}</b><span class="fine">${esc(b.how)}</span>${b.ok?'<span class="fine got">Đã mở khóa</span>':`<div class="meter sm"><div style="width:${Math.round(b.have/b.need*100)}%"></div></div><span class="fine">${b.have}/${b.need}</span>`}<span class="rw">${b.ok?((paid||[]).includes(b.id)?`Đã nhận ${vn(n)} xu`:`Sẽ nhận ${vn(n)} xu sau lượt chơi tới`):`Thưởng ${vn(n)} xu`}</span></div>`}
 function gameBadgeCard(g,sv){const n=bank(g.id).length,got=(sv[g.id]||[]).length;
   return `<div class="gbdg c${g.is}"><b>${g.name}</b><div class="meter sm"><div style="width:${Math.round(got/n*100)}%"></div></div><span class="fine">${got}/${n} câu đã chinh phục</span><span class="pips">${TIERS.map(([k,name,p])=>`<span class="pip t-${k}${got>=Math.ceil(n*p)?' on':''}" title="${name}: ${Math.ceil(n*p)} câu">${name}</span>`).join('')}</span></div>`}
 function badgePanel(x,ess){
   const L=badgeList(x,ess),sv=((x&&x.stats)||{}).solved||{};
   return `<p class="bsum">${MEDAL}<b>${L.filter(b=>b.ok).length}</b>/${L.length} huy hiệu</p>
-    <h3 class="bgrp">Bộ câu hỏi</h3><p class="fine">Mỗi câu chỉ tính một lần, khi trả lời đúng ngay lần đầu (trò nhiều bước: đúng hết các bước). Đồng: 40% số câu của trò, Bạc: 70%, Vàng: tất cả.</p>
+    <h3 class="bgrp">Bộ câu hỏi</h3><p class="fine">Mỗi câu chỉ tính một lần, khi trả lời đúng ngay lần đầu (trò nhiều bước: đúng hết các bước). Đồng: 40% số câu của trò, Bạc: 70%, Vàng: tất cả. Thưởng: Đồng 50 xu, Bạc 100 xu, Vàng 200 xu.</p>
     <div class="gbdgs">${GAMEB().map(g=>gameBadgeCard(g,sv)).join('')}</div>
-    ${[...new Set(L.filter(b=>b.grp!=='Bộ câu hỏi').map(b=>b.grp))].map(gp=>`<h3 class="bgrp">${gp}</h3><div class="bdgs">${L.filter(b=>b.grp===gp).map(badgeHtml).join('')}</div>`).join('')}`;
+    ${[...new Set(L.filter(b=>b.grp!=='Bộ câu hỏi').map(b=>b.grp))].map(gp=>`<h3 class="bgrp">${gp}</h3><div class="bdgs">${L.filter(b=>b.grp===gp).map(b=>badgeHtml(b,(x&&x.paid)||[])).join('')}</div>`).join('')}`;
 }
 function renderBadges(){
   G=null;

@@ -74,7 +74,34 @@ const vnDay = (ms = Date.now()) => new Date(ms + 7 * 3600000).toISOString().slic
 function dayStreak(days, today) { const set = new Set(days); let n = 0, d = Date.parse(today + "T00:00:00Z"); while (set.has(new Date(d).toISOString().slice(0, 10))) { n++; d -= DAY; } return n; }
 function bestRun(days) { const s = [...new Set(days || [])].sort(); let best = 0, run = 0, prev = 0; for (const d of s) { const ms = Date.parse(d + "T00:00:00Z"); run = prev && ms - prev === DAY ? run + 1 : 1; prev = ms; best = Math.max(best, run); } return best; }
 const xuOut = x => { x = x || {}; return { total: x.total || 0, peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()),
-  stats: { solved: x.solved || {}, maxStreak: x.maxStreak || 0, perfect: x.perfect || 0, bestDays: bestRun(x.days) } }; };
+  stats: { solved: x.solved || {}, maxStreak: x.maxStreak || 0, perfect: x.perfect || 0, bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
+// Thưởng xu khi mở khóa huy hiệu (mỗi huy hiệu một lần). Danh sách huy hiệu do trình duyệt tính; máy chủ giữ mức thưởng.
+const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 100, praised: 150, write3s: 200, king: 1000 };
+function badgeReward(id) {
+  let m = /^([a-z-]+)-(dong|bac|vang)$/.exec(id);
+  if (m && GAME_IDS.includes(m[1]) && m[1] !== "thi-thu") return { dong: 50, bac: 100, vang: 200 }[m[2]];
+  m = /^isl([0-4])-([12])$/.exec(id); if (m) return m[2] === "1" ? 150 : 300;
+  return BADGE_FIXED[id] || 0;
+}
+// Số câu (số dòng) của từng ngân hàng: phải khớp với data/*.js (cam-thu = 50 ở tu-tu.js + 20 ở dau-cau.js).
+const BANK_ROWS = { "cay-cau": 50, "tau-chu": 50, "tham-tu": 50, "dau-cau": 51, "ghep-cau": 50, "cau-noi": 50, "sua-cau": 52, "so-sanh": 50, "nhan-hoa": 50, "cam-thu": 70,
+  "noi-doi": 13, "kinh-lup": 50, "tu-lay": 53, "thanh-ngu": 51, "phan-loai": 50, "nhieu-nghia": 52, "cap-tu": 57, "chinh-ta": 55, "xep-doan": 50, "doc-hieu": 50 };
+const ISL_GAMES = [["cay-cau", "tau-chu", "tham-tu", "dau-cau"], ["ghep-cau", "cau-noi", "sua-cau"], ["so-sanh", "nhan-hoa", "cam-thu"],
+  ["noi-doi", "kinh-lup", "tu-lay", "thanh-ngu", "phan-loai", "nhieu-nghia", "cap-tu", "chinh-ta"], ["xep-doan", "doc-hieu"]];
+// Máy chủ tự kiểm tra điều kiện của huy hiệu trước khi thưởng xu
+function earned(id, p) {
+  const x = p.xu || {}, sv = x.solved || {}, E = Array.isArray(p.essays) ? p.essays : [];
+  const tierOk = (g, tier) => BANK_ROWS[g] > 0 && (sv[g] || []).length >= Math.ceil(BANK_ROWS[g] * { dong: 0.4, bac: 0.7, vang: 1 }[tier]);
+  let m = /^([a-z-]+)-(dong|bac|vang)$/.exec(id); if (m) return tierOk(m[1], m[2]);
+  m = /^isl([0-4])-([12])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g, m[2] === "1" ? "dong" : "vang"));
+  switch (id) {
+    case "streak10": return (x.maxStreak || 0) >= 10; case "streak20": return (x.maxStreak || 0) >= 20; case "streak30": return (x.maxStreak || 0) >= 30;
+    case "perfect5": return (x.perfect || 0) >= 5; case "days7": return bestRun(x.days) >= 7; case "days30": return bestRun(x.days) >= 30;
+    case "write5": return E.length >= 5; case "praised": return E.filter(e => e.comment).length >= 3; case "write3s": return E.filter(e => e.stars === 3).length >= 5;
+    case "king": return [0, 1, 2, 3, 4].every(k => earned("isl" + k + "-2", p));
+  }
+  return false;
+}
 const canKid = (me, code) => me.role === "teacher" || me.role === "admin" || (me.role === "parent" && (me.kids || []).includes(code));
 function report(st, p, withLink) {
   const o = { code: st.code, name: st.name || st.code, active: !!st.active, best: (p && p.best) || {}, essays: essaysOut(p && p.essays), xu: xuOut(p && p.xu), updated: (p && p.updated_at) || null };
@@ -142,7 +169,7 @@ async function handle(req, res) {
     }
     x.total = Math.max(0, (x.total || 0) + delta + bonus.reduce((a, b) => a + b[1], 0)); x.peak = Math.max(x.peak || 0, x.total);
     // thống kê cho huy hiệu: các câu (số thứ tự trong ngân hàng) đã trả lời đúng ngay lần đầu, chuỗi dài nhất, số lượt hoàn hảo
-    const sv = (Array.isArray(body.solved) ? body.solved : []).map(n => parseInt(n, 10)).filter(n => n >= 0 && n < 1000).slice(0, 50);
+    const sv = (Array.isArray(body.solved) ? body.solved : []).map(n => parseInt(n, 10)).filter(n => n >= 0 && n < (BANK_ROWS[game] || 0)).slice(0, 50);
     if (sv.length && game !== "thi-thu") { x.solved = { ...(x.solved || {}) }; x.solved[game] = [...new Set([...(x.solved[game] || []), ...sv])].sort((a, b) => a - b); }
     x.maxStreak = Math.max(x.maxStreak || 0, Math.min(200, parseInt(body.maxStreak, 10) || 0));
     if (body.perfect === true && game !== "thi-thu") x.perfect = (x.perfect || 0) + 1;
@@ -153,6 +180,14 @@ async function handle(req, res) {
     }
     await progPut(p);
     return out({ ...report({ code: me.code, name: me.name, active: true }, p, false), bonus: p.bonus });
+  }
+  if (a === "badge.claim") {
+    const me = need(await who(req), ["student"]);
+    const p = await prog(me.code), x = { ...(p.xu || {}) }; x.paid = Array.isArray(x.paid) ? x.paid : [];
+    const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(String))].filter(id => badgeReward(id) > 0 && !x.paid.includes(id) && earned(id, p)).slice(0, 80);
+    const got = ids.map(id => [id, badgeReward(id)]);
+    if (got.length) { x.paid = [...x.paid, ...ids]; x.total = (x.total || 0) + got.reduce((s, g) => s + g[1], 0); x.peak = Math.max(x.peak || 0, x.total); p.xu = x; await progPut(p); }
+    return out({ xu: xuOut(x), got });
   }
   if (a === "gift.request") {
     const me = need(await who(req), ["student"]);
