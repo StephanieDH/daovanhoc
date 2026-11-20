@@ -180,13 +180,16 @@ function toast(n,label,cls){
 function xuAdd(n,label,quiet){if(!G||isStaff())return;G.xu+=n;G.xuLines.push([label,n]);if(!quiet)toast(n,label);renderTotal()}
 function xuJudge(prev){
   if(!G||isStaff()||G.ended)return;const m=G.msg;if(!m||m===prev)return;
+  // đơn vị tính xu: mỗi câu hỏi; trò nhiều bước (một câu có nhiều bước) chỉ tính xu một lần, ở bước đúng đầu tiên
+  const u=G.qs?'q'+G.i:rowKey(),paid=(G.paidU=G.paidU||new Set());
   if(m.k==='ok'){const tries=G.since;G.since=0;
-    const k=rowKey(),old=k!=null&&solvedSet().has(k);
-    if(old){if(tries===0&&!(G.oldNoted=G.oldNoted||new Set()).has(k)){G.oldNoted.add(k);toast(0,'Câu này em đã làm đúng rồi · không cộng xu')}if(tries>0)G.streak=0}
-    else if(tries===0){xuAdd(XU.first,'Đúng ngay lần đầu');G.streak++;G.maxStreak=Math.max(G.maxStreak||0,G.streak);if(G.streak%10===0)xuAdd(XU.s10,`Chuỗi ${G.streak} câu đúng liên tiếp!`);else if(G.streak%5===0)xuAdd(XU.s5,`Chuỗi ${G.streak} câu đúng liên tiếp!`)}
-    else{if(tries===1)xuAdd(XU.second,'Đúng ở lần thử thứ hai');else toast(0,'Đúng sau nhiều lần thử · không cộng xu');G.streak=0}}
-  else if(m.k==='bad'){G.since++;markDirty();xuAdd(XU.wrong,G.streak>=2?'Trả lời sai, mất chuỗi':'Trả lời sai');G.streak=0}
-  else if(m.k==='weak'){G.since++;markDirty();if(G.streak>=2)toast(0,'Gần đúng, mất chuỗi');G.streak=0}
+    if(u!=null&&paid.has(u)){if(tries>0)G.streak=0}
+    else{if(u!=null)paid.add(u);
+      const k=rowKey(),old=k!=null&&solvedSet().has(k);
+      if(old){if(tries===0&&!(G.oldNoted=G.oldNoted||new Set()).has(k)){G.oldNoted.add(k);toast(0,'Câu này em đã làm đúng rồi · không cộng xu')}if(tries>0)G.streak=0}
+      else if(tries===0){xuAdd(XU.first,'Đúng ngay lần đầu');G.streak++;G.maxStreak=Math.max(G.maxStreak||0,G.streak);if(G.streak%10===0)xuAdd(XU.s10,`Chuỗi ${G.streak} câu đúng liên tiếp!`);else if(G.streak%5===0)xuAdd(XU.s5,`Chuỗi ${G.streak} câu đúng liên tiếp!`)}
+      else{if(tries===1)xuAdd(XU.second,'Đúng ở lần thử thứ hai');else toast(0,'Đúng sau nhiều lần thử · không cộng xu');G.streak=0}}}
+  else if(m.k==='bad'||m.k==='weak'){G.since++;markDirty();const w=m.k==='weak'?'Gần đúng':'Trả lời sai';xuAdd(XU.wrong,G.streak>=2?w+', mất chuỗi':w);G.streak=0}
   const el=document.getElementById('streak');if(el)el.innerHTML=streakHtml();
 }
 function groupLines(L){const m=new Map();L.forEach(([l,n])=>{const k=l+'|'+n,o=m.get(k)||{l,n,c:0};o.c++;m.set(k,o)});return [...m.values()]}
@@ -478,7 +481,7 @@ function checks(a){const D=G.de;return [
   ...D.needs.map(k=>({ok:a.c[k]>0,t:`${NEED[k].n}: ${a.c[k]}`,h:NEED[k].h}))]}
 BUILD['thi-thu']=()=>{
   const all=rows('thi-thu');
-  G.newDe=()=>{const [de,min,max,needs]=all[Math.floor(Math.random()*all.length)];G.de={de,min:+min,max:+max,needs:needs.split(',').filter(k=>NEED[k])};G.text=''};
+  G.newDe=()=>{const sub=new Set((essays||[]).map(e=>e.de)),fresh=all.filter(r=>!sub.has(r[0])),pool=fresh.length?fresh:all;const [de,min,max,needs]=pool[Math.floor(Math.random()*pool.length)];G.de={de,min:+min,max:+max,needs:needs.split(',').filter(k=>NEED[k])};G.text=''};
   G.newDe();
   G.view=()=>{
     const D=G.de;
@@ -508,9 +511,9 @@ function updateThi(){
 function submitThi(){
   if(G.text.trim().length<20){document.getElementById('result').innerHTML='<div class="msg weak"><b>Khoan đã.</b><span>Bé viết thêm rồi hãy nộp bài nhé.</span></div>';return}
   const a=updateThi(),cs=checks(a),met=cs.filter(c=>c.ok).length,n=cs.length,st=met===n?3:met===n-1?2:met>=1?1:0;
-  if(!isStaff()){G.subs=G.subs||{};const k=G.de.de;
-    if(!G.subs[k]){G.subs[k]=1;xuAdd(XU.thiSubmit,'Nộp bài thi thử',true);if(st)xuAdd(st*XU.star,`Đạt ${st} sao`,true)}
-    if(st===3&&!G.subs[k+'#3']){G.subs[k+'#3']=1;xuAdd(XU.thiFull,'Bài đạt đủ yêu cầu của đề',true)}}
+  if(!isStaff()){G.subs=G.subs||{};const k=G.de.de,done=G.subs[k]||(essays||[]).some(e=>e.de===k);
+    if(!done){G.subs[k]=1;xuAdd(XU.thiSubmit,'Nộp bài thi thử',true);if(st)xuAdd(st*XU.star,`Đạt ${st} sao`,true);if(st===3)xuAdd(XU.thiFull,'Bài đạt đủ yêu cầu của đề',true)}
+    else toast(0,'Đề này em đã nộp rồi · không cộng xu')}
   const lines=groupLines(G.xuLines),delta=G.xu;G.xuLines=[];
   document.getElementById('result').innerHTML=`<div class="msg ${st===3?'ok':'weak'}"><b>${stars(st)}</b><span>${st===3?'Bài làm đạt đủ yêu cầu của đề. Giỏi lắm!':`Bài làm đạt ${met}/${n} yêu cầu. Xem bảng kiểm tra để sửa và nộp lại nhé.`}${isStudent()?' Bài đã được lưu, thầy cô sẽ đọc và nhận xét.':isStaff()?' (Chơi thử: bài không được lưu.)':''}</span></div>${isStaff()?'':`<div class="xu-sum" id="xusum">${xuSumHtml(lines,delta,null)}</div>`}`;
   saveRound('thi-thu',st,isStudent()?{de:G.de.de,text:G.text}:undefined).then(r=>{const el=document.getElementById('xusum');if(el)el.innerHTML=xuSumHtml(lines,delta,r)});

@@ -160,7 +160,9 @@ async function handle(req, res) {
     p.best = { ...(p.best || {}) }; if (!(p.best[game] >= stars)) p.best[game] = stars;
     // xu: phần cộng/trừ trong lượt chơi do trình duyệt gửi lên (giới hạn hợp lí), thưởng thêm do máy chủ tính
     const x = { ...(p.xu || {}) }, bonus = [];
-    const delta = Math.max(-500, Math.min(900, parseInt(body.xu, 10) || 0));
+    let delta = Math.max(-500, Math.min(900, parseInt(body.xu, 10) || 0));
+    // thi thử: mỗi đề chỉ được xu ở lần nộp đầu tiên
+    if (game === 'thi-thu' && body.essay && (p.essays || []).some(e => e.de === String(body.essay.de || '').slice(0, 300))) delta = Math.min(delta, 0);
     if (stars === 3 && prevStars < 3) bonus.push(["Lần đầu đạt 3 sao ở trò này", 50]);
     const today = vnDay(); x.days = Array.isArray(x.days) ? x.days : [];
     if (!x.days.includes(today)) {
