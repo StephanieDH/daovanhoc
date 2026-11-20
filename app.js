@@ -124,7 +124,7 @@ function goalsHtml(L){
   return `<div class="goals">${giftRow}${badgeRow}</div>`;
 }
 function rulesHtml(cls){
-  const R=[['up','+10','Đúng ngay lần đầu'],['up','+5','Đúng ở lần thử 2'],['dn','−2','Mỗi lần sai'],['gr','0','Câu đã làm đúng rồi'],['fl','+50','Đúng liền 5 câu'],['fl','+100','Đúng liền 10 câu'],['up','+10','Mỗi sao cuối lượt'],['up','+15','Chơi mỗi ngày']];
+  const R=[['up','+10','Đúng ngay lần đầu'],['up','+5','Đúng ở lần thử 2'],['dn','−2','Mỗi lần sai'],['gr','0','Câu đã làm đúng rồi'],['fl','+50','Đúng liền 5 câu'],['fl','+100','Đúng liền 10 câu'],['up','+10','Mỗi sao mới của trò'],['up','+15','Chơi mỗi ngày']];
   return `<div class="rules${cls?' '+cls:''}"><p class="rt">${COIN}Cách kiếm xu đổi quà</p><div class="rg">${R.map(([c,n,l])=>`<div class="rr ${c}"><b>${n}</b><span>${l}</span></div>`).join('')}</div><p class="rgi">Đủ xu thì đổi quà ngay hoặc để dành. Đổi quà sẽ trừ xu.</p></div>`;
 }
 function acct(){
@@ -199,7 +199,9 @@ function xuSumHtml(lines,delta,r){
 function renderEnd(){
   if(G.endHtml){$app.innerHTML=G.endHtml;return}
   const st=starsFrom(G.correct,G.total);
-  if(st&&!isStaff())xuAdd(st*XU.star,`Đạt ${st} sao`,true);
+  // xu sao: chỉ thưởng phần sao vượt kỷ lục cũ của trò này (chơi lại để đạt lại số sao cũ thì không có xu)
+  const gain=Math.max(0,st-(best[G.g.id]||0));
+  if(gain&&!isStaff())xuAdd(gain*XU.star,`Thêm ${gain} sao mới (kỷ lục ${st} sao)`,true);
   G.ended=true;const lines=groupLines(G.xuLines),delta=G.xu,gid=G.g.id;
   const idx=GAMES.indexOf(G.g),nx=GAMES[idx+1];
   $app.innerHTML=bar(G.g)+`<div class="board end">
