@@ -161,8 +161,12 @@ async function handle(req, res) {
     // xu: phần cộng/trừ trong lượt chơi do trình duyệt gửi lên (giới hạn hợp lí), thưởng thêm do máy chủ tính
     const x = { ...(p.xu || {}) }, bonus = [];
     let delta = Math.max(-500, Math.min(900, parseInt(body.xu, 10) || 0));
-    // thi thử: mỗi đề chỉ được xu ở lần nộp đầu tiên
-    if (game === 'thi-thu' && body.essay && (p.essays || []).some(e => e.de === String(body.essay.de || '').slice(0, 300))) delta = Math.min(delta, 0);
+    // thi thử: mỗi đề được tối đa +20 (lần nộp đầu) + 10 mỗi sao vượt kỷ lục cũ của đề + 30 (lần đầu đạt 3 sao)
+    if (game === 'thi-thu' && body.essay) {
+      const de = String(body.essay.de || '').slice(0, 300), old = (p.essays || []).filter(e => e.de === de), prev = Math.max(0, ...old.map(e => e.stars || 0));
+      const cap = (old.length ? 0 : 20) + 10 * Math.max(0, stars - prev) + (stars === 3 && prev < 3 ? 30 : 0);
+      delta = Math.min(delta, cap);
+    }
     if (stars === 3 && prevStars < 3) bonus.push(["Lần đầu đạt 3 sao ở trò này", 50]);
     const today = vnDay(); x.days = Array.isArray(x.days) ? x.days : [];
     if (!x.days.includes(today)) {

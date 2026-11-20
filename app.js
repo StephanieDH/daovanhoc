@@ -511,9 +511,14 @@ function updateThi(){
 function submitThi(){
   if(G.text.trim().length<20){document.getElementById('result').innerHTML='<div class="msg weak"><b>Khoan đã.</b><span>Bé viết thêm rồi hãy nộp bài nhé.</span></div>';return}
   const a=updateThi(),cs=checks(a),met=cs.filter(c=>c.ok).length,n=cs.length,st=met===n?3:met===n-1?2:met>=1?1:0;
-  if(!isStaff()){G.subs=G.subs||{};const k=G.de.de,done=G.subs[k]||(essays||[]).some(e=>e.de===k);
-    if(!done){G.subs[k]=1;xuAdd(XU.thiSubmit,'Nộp bài thi thử',true);if(st)xuAdd(st*XU.star,`Đạt ${st} sao`,true);if(st===3)xuAdd(XU.thiFull,'Bài đạt đủ yêu cầu của đề',true)}
-    else toast(0,'Đề này em đã nộp rồi · không cộng xu')}
+  if(!isStaff()){
+    // mỗi đề: +20 ở lần nộp đầu; +10 cho mỗi sao vượt kỷ lục cũ của đề; +30 lần đầu bài đạt đủ yêu cầu (3 sao)
+    G.subs=G.subs||{};const k=G.de.de,old=(essays||[]).filter(e=>e.de===k),first=!old.length&&!(k in G.subs);
+    const prev=Math.max(0,G.subs[k]||0,...old.map(e=>e.stars||0)),gain=Math.max(0,st-prev);G.subs[k]=Math.max(prev,st);
+    if(first)xuAdd(XU.thiSubmit,'Nộp bài thi thử',true);
+    if(gain)xuAdd(gain*XU.star,first?`Đạt ${st} sao`:`Bài tăng thêm ${gain} sao so với lần trước`,true);
+    if(st===3&&prev<3)xuAdd(XU.thiFull,'Bài đạt đủ yêu cầu của đề',true);
+    if(!first&&!gain)toast(0,'Bài chưa tăng sao so với lần trước · không cộng xu')}
   const lines=groupLines(G.xuLines),delta=G.xu;G.xuLines=[];
   document.getElementById('result').innerHTML=`<div class="msg ${st===3?'ok':'weak'}"><b>${stars(st)}</b><span>${st===3?'Bài làm đạt đủ yêu cầu của đề. Giỏi lắm!':`Bài làm đạt ${met}/${n} yêu cầu. Xem bảng kiểm tra để sửa và nộp lại nhé.`}${isStudent()?' Bài đã được lưu, thầy cô sẽ đọc và nhận xét.':isStaff()?' (Chơi thử: bài không được lưu.)':''}</span></div>${isStaff()?'':`<div class="xu-sum" id="xusum">${xuSumHtml(lines,delta,null)}</div>`}`;
   saveRound('thi-thu',st,isStudent()?{de:G.de.de,text:G.text}:undefined).then(r=>{const el=document.getElementById('xusum');if(el)el.innerHTML=xuSumHtml(lines,delta,r)});
