@@ -43,6 +43,10 @@ const lc=s=>s?s.charAt(0).toLowerCase()+s.slice(1):s;
 const noComma=s=>s.replace(/[,.]$/,'');
 const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const pick=(a,n)=>shuffle(a).slice(0,n);
+// câu (số thứ tự trong ngân hàng) em đã trả lời đúng ngay lần đầu ở trò đang chơi
+const solvedSet=()=>new Set(G&&G.g&&isStudent()?((((xu&&xu.stats)||{}).solved||{})[G.g.id]||[]):[]);
+// bốc n câu, ưu tiên câu chưa làm đúng; hết câu mới mới lấy lại câu cũ
+function pickNew(a,n,kf){const S=solvedSet(),sh=shuffle(a);return [...sh.filter(x=>!S.has(kf(x))),...sh.filter(x=>S.has(kf(x)))].slice(0,n)}
 const bank=id=>((window.BANK||{})[id]||[]);
 const size=id=>id==='noi-doi'?bank(id).reduce((a,s)=>a+s.split(';').length,0):id==='nhieu-nghia'?bank(id).reduce((a,s)=>a+(s.startsWith('P|')?1:s.split('|').length-2),0):bank(id).length;
 const unit=id=>id==='noi-doi'?'cặp':id==='thi-thu'?'đề':id==='xep-doan'?'đoạn':id==='doc-hieu'?'bài đọc':id==='cap-tu'?'lượt':'câu';
@@ -59,7 +63,7 @@ let best=LS.get('dcv-best-guest',{})||{};
 let essays=[];
 const COIN='<svg class="coin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="6"/></svg>';
 const FLAME='<svg class="flame" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.6 3.4 4.5 5.2 4.5 10a4.5 4.5 0 0 1-9 0c0-2 1-3.4 2.2-4.4-.1 1.6.6 2.7 1.7 3.1C11.2 9 10.9 5.6 12 2.5z"/></svg>';
-const XU={first:10,second:5,later:2,wrong:-2,s5:50,s10:100,star:10,thiSubmit:20,thiFull:30};
+const XU={first:10,second:5,later:0,wrong:-2,s5:50,s10:100,star:10,thiSubmit:20,thiFull:30};
 let xu=LS.get('dcv-xu-guest',{total:0,peak:0})||{total:0,peak:0};
 const isStudent=()=>!!me&&me.role==='student';
 const isStaff=()=>!!me&&['teacher','admin','parent'].includes(me.role);
@@ -120,7 +124,7 @@ function goalsHtml(L){
   return `<div class="goals">${giftRow}${badgeRow}</div>`;
 }
 function rulesHtml(cls){
-  const R=[['up','+10','Đúng ngay lần đầu'],['dn','−2','Mỗi lần sai'],['fl','+50','Đúng liền 5 câu'],['fl','+100','Đúng liền 10 câu'],['up','+10','Mỗi sao cuối lượt'],['up','+15','Chơi mỗi ngày']];
+  const R=[['up','+10','Đúng ngay lần đầu'],['up','+5','Đúng ở lần thử 2'],['dn','−2','Mỗi lần sai'],['gr','0','Câu đã làm đúng rồi'],['fl','+50','Đúng liền 5 câu'],['fl','+100','Đúng liền 10 câu'],['up','+10','Mỗi sao cuối lượt'],['up','+15','Chơi mỗi ngày']];
   return `<div class="rules${cls?' '+cls:''}"><p class="rt">${COIN}Cách kiếm xu đổi quà</p><div class="rg">${R.map(([c,n,l])=>`<div class="rr ${c}"><b>${n}</b><span>${l}</span></div>`).join('')}</div><p class="rgi">Đủ xu thì đổi quà ngay hoặc để dành. Đổi quà sẽ trừ xu.</p></div>`;
 }
 function acct(){
@@ -162,7 +166,7 @@ function rowKey(){return G.qs?(G.qs[G.i]||{}).key:(G.rowKeys||[])[G.i]}
 function markDirty(){const k=rowKey();if(k!=null)(G.dirty=G.dirty||new Set()).add(k);G.anyDirty=true}
 function markRow(){const k=rowKey();if(k!=null)(G.seen=G.seen||new Set()).add(k)}
 function solvedKeys(){return G?[...(G.seen||[])].filter(k=>!(G.dirty||new Set()).has(k)):[]}
-function pickK(arr,n){const p=pick(arr.map((r,ix)=>[r,ix]),n);G.rowKeys=p.map(x=>x[1]);return p.map(x=>x[0])}
+function pickK(arr,n){const p=pickNew(arr.map((r,ix)=>[r,ix]),n,x=>x[1]);G.rowKeys=p.map(x=>x[1]);return p.map(x=>x[0])}
 function next(){
   markRow();
   if(G.onNext)G.onNext();else{G.total++;G.i++;resetQuiz()}
@@ -177,8 +181,10 @@ function xuAdd(n,label,quiet){if(!G||isStaff())return;G.xu+=n;G.xuLines.push([la
 function xuJudge(prev){
   if(!G||isStaff()||G.ended)return;const m=G.msg;if(!m||m===prev)return;
   if(m.k==='ok'){const tries=G.since;G.since=0;
-    if(tries===0){xuAdd(XU.first,'Đúng ngay lần đầu');G.streak++;G.maxStreak=Math.max(G.maxStreak||0,G.streak);if(G.streak%10===0)xuAdd(XU.s10,`Chuỗi ${G.streak} câu đúng liên tiếp!`);else if(G.streak%5===0)xuAdd(XU.s5,`Chuỗi ${G.streak} câu đúng liên tiếp!`)}
-    else{xuAdd(tries===1?XU.second:XU.later,tries===1?'Đúng ở lần thử thứ hai':'Đúng sau nhiều lần thử');G.streak=0}}
+    const k=rowKey(),old=k!=null&&solvedSet().has(k);
+    if(old){if(tries===0&&!(G.oldNoted=G.oldNoted||new Set()).has(k)){G.oldNoted.add(k);toast(0,'Câu này em đã làm đúng rồi · không cộng xu')}if(tries>0)G.streak=0}
+    else if(tries===0){xuAdd(XU.first,'Đúng ngay lần đầu');G.streak++;G.maxStreak=Math.max(G.maxStreak||0,G.streak);if(G.streak%10===0)xuAdd(XU.s10,`Chuỗi ${G.streak} câu đúng liên tiếp!`);else if(G.streak%5===0)xuAdd(XU.s5,`Chuỗi ${G.streak} câu đúng liên tiếp!`)}
+    else{if(tries===1)xuAdd(XU.second,'Đúng ở lần thử thứ hai');else toast(0,'Đúng sau nhiều lần thử · không cộng xu');G.streak=0}}
   else if(m.k==='bad'){G.since++;markDirty();xuAdd(XU.wrong,G.streak>=2?'Trả lời sai, mất chuỗi':'Trả lời sai');G.streak=0}
   else if(m.k==='weak'){G.since++;markDirty();if(G.streak>=2)toast(0,'Gần đúng, mất chuỗi');G.streak=0}
   const el=document.getElementById('streak');if(el)el.innerHTML=streakHtml();
@@ -210,7 +216,7 @@ const opt=(label,ok,why)=>({label,ok,why});
 const pt=o=>`<span class="pt ${o.ok===true?'good':o.ok==='weak'?'weak':'bad'}">${o.label}</span>`;
 const BLANK='<span class="blank">?</span>';
 function resetQuiz(){G.sel=null;G.tried=[];G.done=false;G.msg=null}
-function quiz(id,map){G.qs=pick(rows(id).map((r,ix)=>[r,ix]),QUIZ_N).map(([r,ix])=>Object.assign(map(r),{key:ix}));resetQuiz()}
+function quiz(id,map){G.qs=pickNew(rows(id).map((r,ix)=>[r,ix]),QUIZ_N,x=>x[1]).map(([r,ix])=>Object.assign(map(r),{key:ix}));resetQuiz()}
 function renderQuiz(){
   if(G.i>=G.qs.length)return renderEnd();
   const q=G.qs[G.i],sel=G.sel!=null?q.options[G.sel]:null;
@@ -544,12 +550,12 @@ BUILD['phan-loai']=()=>{
 const hl=s=>s.replace(/\*([^*]+)\*/g,'<span class="nhu">$1</span>');
 BUILD['nhieu-nghia']=()=>{
   const all=bank('nhieu-nghia'),sets=all.filter(s=>!s.startsWith('P|')),pairs=all.filter(s=>s.startsWith('P|')),qs=[];
-  pick(sets,2).forEach(s=>{const [w,gloss,...ss]=s.split('|');shuffle(ss).forEach(x=>{const [sent,a]=x.split('=');
+  pickNew(sets,2,s=>all.indexOf(s)).forEach(s=>{const [w,gloss,...ss]=s.split('|');shuffle(ss).forEach(x=>{const [sent,a]=x.split('=');
     qs.push({intro:`<p class="ask">Từ <b>“${w}”</b> trong câu dưới đây mang nghĩa gốc hay nghĩa chuyển?</p>`,
       options:[opt('Nghĩa gốc',a==='g',a==='g'?`Đây là nghĩa gốc của “${w}”: ${gloss}.`:`Nghĩa gốc của “${w}” là ${gloss}. Ở câu này, từ đã chuyển sang chỉ sự vật khác có nét giống.`),
                opt('Nghĩa chuyển',a==='c',a==='c'?`Đây là nghĩa chuyển: từ nghĩa gốc (${gloss}) chuyển sang chỉ sự vật khác có nét giống.`:`Ở câu này, “${w}” dùng đúng nghĩa gốc: ${gloss}.`)],
       view:()=>hl(sent),key:all.indexOf(s)})})});
-  pick(pairs,2).forEach(s=>{const [,two,a,why]=s.split('|');
+  pickNew(pairs,2,s=>all.indexOf(s)).forEach(s=>{const [,two,a,why]=s.split('|');
     qs.push({intro:'<p class="ask">Hai từ được tô màu là từ nhiều nghĩa hay từ đồng âm?</p>',
       options:[opt('Từ nhiều nghĩa',a==='nn',a==='nn'?why:'Thử nghĩ: hai nghĩa này có liên quan gì với nhau không?'),opt('Từ đồng âm',a==='da',a==='da'?why:'Hai nghĩa này có nét liên quan với nhau, hãy nghĩ lại.')],
       view:()=>two.split(' / ').map(hl).join('<br>'),key:all.indexOf(s)})});
@@ -559,7 +565,7 @@ BUILD['nhieu-nghia']=()=>{
 /* ---------- Cặp từ đối đầu ---------- */
 BUILD['cap-tu']=()=>{
   const all=rows('cap-tu').map((r,ix)=>Object.assign(r,{ix})),pairs=all.filter(r=>r[0]!=='T'),tones=all.filter(r=>r[0]==='T');
-  const pp=pick(pairs,4),tt=pick(tones,2);G.rowKeys=[...pp,...tt].map(r=>r.ix);
+  const pp=pickNew(pairs,4,r=>r.ix),tt=pickNew(tones,2,r=>r.ix);G.rowKeys=[...pp,...tt].map(r=>r.ix);
   G.items=[...pp.map(([w,s,a,d])=>({type:'p',w,s,a,chips:shuffle([s,a,...d.split(',')])})),
     ...tt.map(([,sent,r,why,w1,y1,w2,y2])=>({type:'t',sent,ans:r,chips:shuffle([r,w1,w2]),why:{[r]:why,[w1]:y1,[w2]:y2}}))];
   G.n=G.items.length;const reset=()=>{G.got={};G.bad=[];G.missed=false;G.msg=null};reset();
@@ -661,7 +667,7 @@ BUILD['dau-cau']=()=>{
 const READ_MISS='Đọc lại đoạn văn và tìm chi tiết liên quan nhé.';
 BUILD['doc-hieu']=()=>{
   const qs=[];
-  pick(rows('doc-hieu').map((r,ix)=>Object.assign(r,{ix})),PER['doc-hieu']).forEach(row=>{const [p,by,qq]=row,qa=qq.split('#');qa.forEach((q,n)=>{const [qt,r,why,w1,w2]=q.split('~');
+  pickNew(rows('doc-hieu').map((r,ix)=>Object.assign(r,{ix})),PER['doc-hieu'],r=>r.ix).forEach(row=>{const [p,by,qq]=row,qa=qq.split('#');qa.forEach((q,n)=>{const [qt,r,why,w1,w2]=q.split('~');
     qs.push({key:row.ix,intro:`<p class="ask">Đọc kĩ đoạn văn rồi trả lời câu hỏi ${n+1}/${qa.length}.</p>`,col:true,
       options:shuffle([opt(r,true,why),opt(w1,false,READ_MISS),opt(w2,false,READ_MISS)]),
       view:()=>`<div class="poem passage">${esc(p).split('/').join('<br>')}${by?`<div class="by">${esc(by)}</div>`:''}<div class="q">${esc(qt)}</div></div>`})})});
