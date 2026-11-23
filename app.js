@@ -3,7 +3,7 @@
 
 const ISLANDS=[
  {name:'Đảo Mở rộng câu',blurb:'Làm câu ngắn dài ra, hiểu từng thành phần của câu.'},
- {name:'Đảo Câu ghép',blurb:'Nối các ý bằng cặp quan hệ từ cho đúng nghĩa.'},
+ {name:'Đảo Câu ghép',blurb:'Nối các ý bằng kết từ, cặp kết từ cho đúng nghĩa.'},
  {name:'Đảo Tu từ',blurb:'So sánh, nhân hóa, điệp ngữ và cảm nhận cái hay của câu thơ.'},
  {name:'Đảo Từ ngữ',blurb:'Từ gợi tả, từ láy, thành ngữ và tục ngữ.'},
  {name:'Đảo Viết đoạn',blurb:'Ghép câu thành đoạn văn và làm bài thi thử.'}
@@ -12,9 +12,9 @@ const GAMES=[
  {id:'cay-cau',is:0,name:'Cây câu',skill:'Thêm thành phần phụ: khi nào, ở đâu, như thế nào, để làm gì.'},
  {id:'tau-chu',is:0,name:'Tàu chữ',skill:'Nhận ra trạng ngữ chỉ thời gian, nơi chốn, nguyên nhân, mục đích, phương tiện.'},
  {id:'tham-tu',is:0,name:'Thám tử câu',skill:'Tìm trạng ngữ, chủ ngữ và vị ngữ trong câu.'},
- {id:'ghep-cau',is:1,name:'Ghép đôi câu',skill:'Nối hai câu đơn thành câu ghép bằng cặp quan hệ từ đúng nghĩa.'},
- {id:'cau-noi',is:1,name:'Cầu nối',skill:'Chọn vế sau hợp nghĩa với cặp quan hệ từ, cặp từ hô ứng.'},
- {id:'sua-cau',is:1,name:'Sửa câu sai',skill:'Phát hiện và sửa quan hệ từ bị dùng sai.'},
+ {id:'ghep-cau',is:1,name:'Ghép đôi câu',skill:'Nối hai câu đơn thành câu ghép bằng cặp kết từ đúng nghĩa.'},
+ {id:'cau-noi',is:1,name:'Cầu nối',skill:'Chọn vế sau hợp nghĩa với cặp kết từ, cặp từ hô ứng.'},
+ {id:'sua-cau',is:1,name:'Sửa câu sai',skill:'Phát hiện và sửa kết từ bị dùng sai.'},
  {id:'so-sanh',is:2,name:'Xưởng so sánh',skill:'Chọn hình ảnh so sánh vừa hợp lý, vừa gợi tả.'},
  {id:'nhan-hoa',is:2,name:'Phép thuật nhân hóa',skill:'Phân biệt nhân hóa với so sánh, chọn câu nhân hóa hay.'},
  {id:'cam-thu',is:2,name:'Kính lúp cảm thụ',skill:'Hiểu cái hay của hình ảnh, biện pháp tu từ, nghĩa của từ và dấu câu.'},
@@ -26,7 +26,7 @@ const GAMES=[
  {id:'thi-thu',is:4,name:'Phòng thi thử',skill:'Viết đoạn văn theo đề, máy kiểm tra các yêu cầu của đề.'},
  {id:'dau-cau',is:0,name:'Nhà máy dấu câu',skill:'Đặt dấu câu đúng chỗ, nhận biết câu kể, câu hỏi, câu cảm, câu khiến.'},
  {id:'phan-loai',is:3,name:'Phân loại từ',skill:'Xếp từ vào giỏ: danh từ, động từ, tính từ, đại từ.'},
- {id:'nhieu-nghia',is:3,name:'Một từ, nhiều nghĩa',skill:'Phân biệt nghĩa gốc, nghĩa chuyển; từ nhiều nghĩa và từ đồng âm.'},
+ {id:'nhieu-nghia',is:3,name:'Một từ, nhiều nghĩa',skill:'Phân biệt nghĩa gốc, nghĩa chuyển của từ đa nghĩa; từ đồng âm (mở rộng).'},
  {id:'cap-tu',is:3,name:'Cặp từ đối đầu',skill:'Tìm từ đồng nghĩa, trái nghĩa và chọn từ đúng sắc thái.'},
  {id:'chinh-ta',is:3,name:'Thợ săn chính tả',skill:'Bắt lỗi l/n, s/x, tr/ch, dấu hỏi/ngã và viết hoa.'},
  {id:'doc-hieu',is:4,name:'Đọc hiểu nhanh',skill:'Đọc đoạn văn, đoạn thơ ngắn và trả lời câu hỏi như trong đề thi.'}
@@ -48,9 +48,13 @@ const solvedSet=()=>new Set(G&&G.g&&isStudent()?((((xu&&xu.stats)||{}).solved||{
 // bốc n câu, ưu tiên câu chưa làm đúng; hết câu mới mới lấy lại câu cũ
 function pickNew(a,n,kf){const S=solvedSet(),sh=shuffle(a);return [...sh.filter(x=>!S.has(kf(x))),...sh.filter(x=>S.has(kf(x)))].slice(0,n)}
 const bank=id=>((window.BANK||{})[id]||[]);
-const size=id=>id==='noi-doi'?bank(id).reduce((a,s)=>a+s.split(';').length,0):id==='nhieu-nghia'?bank(id).reduce((a,s)=>a+(s.startsWith('P|')?1:s.split('|').length-2),0):bank(id).length;
-const unit=id=>id==='noi-doi'?'cặp':id==='thi-thu'?'đề':id==='xep-doan'?'đoạn':id==='doc-hieu'?'bài đọc':id==='cap-tu'?'lượt':'câu';
+const size=id=>baseId(id)==='noi-doi'?bank(id).reduce((a,s)=>a+s.split(';').length,0):baseId(id)==='nhieu-nghia'?bank(id).reduce((a,s)=>a+(s.startsWith('P|')?1:s.split('|').length-2),0):bank(id).length;
+const unit=id=>(id=baseId(id))==='noi-doi'?'cặp':id==='thi-thu'?'đề':id==='xep-doan'?'đoạn':id==='doc-hieu'?'bài đọc':id==='cap-tu'?'lượt':'câu';
 const rows=id=>bank(id).map(s=>s.split('|'));
+// mức Nâng cao: ngân hàng BANK['<trò>-nc'], dùng chung cách chơi với trò gốc
+let LV='';const qbank=id=>bank(id+LV),qrows=id=>qbank(id).map(s=>s.split('|'));
+const baseId=id=>String(id).replace(/-nc$/,'');
+const NCG=()=>GAMES.filter(g=>bank(g.id+'-nc').length).map(g=>({...g,id:g.id+'-nc',base:g.id,nc:true}));
 const STAR='<path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z"/>';
 function stars(n,big){let h=`<span class="stars${big?' big':''}" role="img" aria-label="${n} trên 3 sao">`;for(let i=0;i<3;i++)h+=`<svg viewBox="0 0 24 24" class="${i<n?'on':''}" aria-hidden="true">${STAR}</svg>`;return h+'</span>'}
 const starsFrom=(c,n)=>c===n?3:c>=Math.ceil(n*.75)?2:c>=1?1:0;
@@ -89,8 +93,8 @@ async function saveRound(id,s,essay){
   if(!(best[id]>=s))best[id]=s;LS.set(isStudent()?'dcv-best-'+me.code:'dcv-best-guest',best);
   if(isStudent()){
     const before=new Set(badgeList(xu,essays).filter(b=>b.ok).map(b=>b.id));
-    const solved=solvedKeys(),perfect=!!(G&&G.seen&&G.seen.size&&!G.anyDirty&&id!=='thi-thu');
-    try{const d=await call('save',{game:id,stars:s,essay,xu:delta,solved,maxStreak:G?G.maxStreak||0:0,perfect});essays=d.essays||essays;xu=d.xu||xu;renderTotal();if(G&&G.g.id==='thi-thu')renderEssays();
+    const solved=solvedKeys(),perfect=!!(G&&G.seen&&G.seen.size&&!G.anyDirty&&baseId(id)!=='thi-thu');
+    try{const d=await call('save',{game:id,stars:s,essay,xu:delta,solved,maxStreak:G?G.maxStreak||0:0,perfect});essays=d.essays||essays;xu=d.xu||xu;renderTotal();if(G&&baseId(G.g.id)==='thi-thu')renderEssays();
       // thưởng xu cho huy hiệu mới mở (và huy hiệu mở từ trước khi có thưởng), mỗi huy hiệu một lần
       const now=badgeList(xu,essays),fresh=new Set(now.filter(b=>b.ok&&!before.has(b.id)).map(b=>b.id)),bonus=[...(d.bonus||[])];
       const unpaid=now.filter(b=>b.ok&&!(xu.paid||[]).includes(b.id));
@@ -141,25 +145,29 @@ function acct(){
   </div><p class="fine guest">${net==='off'?'Chưa kết nối được máy chủ. ':''}Chưa đăng nhập vẫn chơi thử được, nhưng sao và xu chỉ lưu trên máy này và chưa đổi được quà.</p>`;
 }
 function renderMap(){
-  G=null;
-  const total=GAMES.reduce((a,g)=>a+size(g.id),0);
+  G=null;LV='';
+  const NC=NCG(),total=[...GAMES,...NC].reduce((a,g)=>a+size(g.id),0),sv=((xu&&xu.stats)||{}).solved||{};
+  const pct=id=>{const n=bank(id).length;return n&&isStudent()&&baseId(id)!=='thi-thu'?' · xong '+Math.round(Math.min(1,(sv[id]||[]).length/n)*100)+'%':''},st3=n=>'★'.repeat(n||0)+'☆'.repeat(3-(n||0));
+  const card=g=>{const nc=NC.find(x=>x.base===g.id);if(!nc)return `<a class="island tinted c${g.is}" href="#${g.id}"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><p>${g.skill}</p><span class="count">${size(g.id)} ${unit(g.id)}</span>${stars(best[g.id]||0)}</a>`;
+    return `<div class="island tinted c${g.is}"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><p>${g.skill}</p><div class="lvs"><a class="lv b" href="#${g.id}">Cơ bản · ${size(g.id)} ${unit(g.id)}<small>${st3(best[g.id])}${pct(g.id)}</small></a><a class="lv n" href="#${nc.id}">Nâng cao · ${size(nc.id)} ${unit(g.id)}<small>${st3(best[nc.id])}${pct(nc.id)}</small></a></div></div>`};
   $app.innerHTML=`<section class="hero"><h1>Chọn một trò chơi để luyện câu văn</h1>
   <p>Mỗi màu là một hòn đảo kỹ năng. Bé chơi trò nào trước cũng được: làm câu dài hơn, hay hơn, rồi viết thành đoạn văn hoàn chỉnh.</p></section>
   ${acct()}
   <div class="isl-legend">${ISLANDS.map((isl,k)=>`<span class="isl-tag c${k}"><span class="isle-dot" aria-hidden="true"></span>${isl.name}</span>`).join('')}</div>
-  <div class="islands">${MIXED.map(g=>`<a class="island tinted c${g.is}" href="#${g.id}"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><p>${g.skill}</p><span class="count">${size(g.id)} ${unit(g.id)}</span>${stars(best[g.id]||0)}</a>`).join('')}</div>
+  <div class="islands">${MIXED.map(card).join('')}</div>
   <p class="note">Ngân hàng có ${total} câu hỏi. Mỗi lượt chơi bốc ngẫu nhiên vài câu, nên mỗi lần chơi sẽ khác nhau.</p>`;
 }
 const streakHtml=()=>G&&G.streak>=2?`${FLAME}Chuỗi ${G.streak}`:'';
-function bar(g,prog){return `<div class="bar"><a class="back" href="#">← Bản đồ</a><div class="gtitle"><span class="isl-tag c${g.is}">${ISLANDS[g.is].name}</span>${g.name}</div><span class="streak" id="streak" aria-live="polite">${streakHtml()}</span>${prog?`<div class="prog">${prog}</div>`:''}</div>`}
+function bar(g,prog){return `<div class="bar"><a class="back" href="#">← Bản đồ</a><div class="gtitle"><span class="isl-tag c${g.is}">${ISLANDS[g.is].name}</span>${g.name}${g.nc?'<span class="nc-tag">Nâng cao</span>':''}</div><span class="streak" id="streak" aria-live="polite">${streakHtml()}</span>${prog?`<div class="prog">${prog}</div>`:''}</div>`}
 function msgHtml(m){if(!m)return '';const t={ok:'Đúng rồi!',bad:'Chưa đúng.',weak:'Gần đúng.',info:'Gợi ý:'}[m.k];return `<div class="msg ${m.k}" role="status"><b>${t}</b><span>${m.t}</span></div>`}
 const nextBtn=(last,a,b)=>`<div class="actions"><button class="primary" data-act="next">${last?'Xem kết quả':a}</button></div>`;
 
 /* ---------- Khung chung ---------- */
 function startGame(g){
   G={g,i:0,correct:0,total:0,msg:null,shake:null,xu:0,xuLines:[],streak:0,since:0};
-  if(!bank(g.id).length){$app.innerHTML=bar(g)+'<div class="board"><p>Chưa tải được câu hỏi. Hãy tải lại trang.</p></div>';return}
-  BUILD[g.id]();render();
+  LV=g.nc?'-nc':'';
+  if(!qbank(g.base||g.id).length){$app.innerHTML=bar(g)+'<div class="board"><p>Chưa tải được câu hỏi. Hãy tải lại trang.</p></div>';return}
+  BUILD[g.base||g.id]();render();
 }
 function render(){if(!G)return renderMap();(G.view||renderQuiz)()}
 function rowKey(){return G.qs?(G.qs[G.i]||{}).key:(G.rowKeys||[])[G.i]}
@@ -206,7 +214,7 @@ function renderEnd(){
   const gain=Math.max(0,st-(best[G.g.id]||0));
   if(gain&&!isStaff())xuAdd(gain*XU.star,`Thêm ${gain} sao mới (kỷ lục ${st} sao)`,true);
   G.ended=true;const lines=groupLines(G.xuLines),delta=G.xu,gid=G.g.id;
-  const idx=GAMES.indexOf(G.g),nx=GAMES[idx+1];
+  const lst=G.g.nc?NCG():GAMES,idx=lst.findIndex(x=>x.id===G.g.id),nx=lst[idx+1];
   $app.innerHTML=bar(G.g)+`<div class="board end">
     <div class="stamp"><span><span class="big">${st}</span>sao</span></div>${stars(st,true)}
     <h2>Hoàn thành “${G.g.name}”!</h2>
@@ -221,7 +229,7 @@ const opt=(label,ok,why)=>({label,ok,why});
 const pt=o=>`<span class="pt ${o.ok===true?'good':o.ok==='weak'?'weak':'bad'}">${o.label}</span>`;
 const BLANK='<span class="blank">?</span>';
 function resetQuiz(){G.sel=null;G.tried=[];G.done=false;G.msg=null}
-function quiz(id,map){G.qs=pickNew(rows(id).map((r,ix)=>[r,ix]),QUIZ_N,x=>x[1]).map(([r,ix])=>Object.assign(map(r),{key:ix}));resetQuiz()}
+function quiz(id,map){G.qs=pickNew(qrows(id).map((r,ix)=>[r,ix]),QUIZ_N,x=>x[1]).map(([r,ix])=>Object.assign(map(r),{key:ix}));resetQuiz()}
 function renderQuiz(){
   if(G.i>=G.qs.length)return renderEnd();
   const q=G.qs[G.i],sel=G.sel!=null?q.options[G.sel]:null;
@@ -245,7 +253,7 @@ const BUILD={};
 /* ---------- Cây câu ---------- */
 const SL={t:{q:'Khi nào?',ph:'khi nào',c:'time'},p:{q:'Ở đâu?',ph:'ở đâu',c:'place'},m:{q:'Như thế nào?',ph:'như thế nào',c:'manner'},r:{q:'Để làm gì? Vì sao?',ph:'để làm gì',c:'reason'}};
 BUILD['cay-cau']=()=>{
-  G.rounds=pickK(rows('cay-cau'),PER['cay-cau']).map(([core,t,p,m,r])=>{
+  G.rounds=pickK(qrows('cay-cau'),PER['cay-cau']).map(([core,t,p,m,r])=>{
     const src={t:t.split(';'),p:p.split(';'),m:m.split(';'),r:r.split(';')},opts={};
     for(const s of ['t','p','m','r']){
       const others=['t','p','m','r'].filter(x=>x!==s);let d,o,n=0;
@@ -290,7 +298,7 @@ BUILD['cay-cau']=()=>{
 const KINDS={time:{n:'Thời gian',c:'time',q:'Khi nào?'},place:{n:'Nơi chốn',c:'place',q:'Ở đâu?'},cause:{n:'Nguyên nhân',c:'reason',q:'Vì sao? Nhờ đâu?'},purpose:{n:'Mục đích',c:'purpose',q:'Để làm gì?'},means:{n:'Phương tiện',c:'manner',q:'Bằng gì? Với cái gì?'}};
 const KLET={T:'time',P:'place',N:'cause',D:'purpose',C:'means',_:null};
 BUILD['tau-chu']=()=>{
-  G.trains=pickK(bank('tau-chu'),PER['tau-chu']).map(s=>s.split('|').map(x=>[x.slice(2),KLET[x[0]]]));
+  G.trains=pickK(qbank('tau-chu'),PER['tau-chu']).map(s=>s.split('|').map(x=>[x.slice(2),KLET[x[0]]]));
   G.n=G.trains.length;G.k=0;G.tried=[];
   G.view=()=>{
     if(G.i>=G.n)return renderEnd();
@@ -317,7 +325,7 @@ BUILD['tau-chu']=()=>{
 const ROLES={tn:{n:'trạng ngữ',c:'time',ab:'TN',h:'Trạng ngữ là phần phụ, thường đứng đầu câu và ngăn cách với phần chính bằng dấu phẩy.'},cn:{n:'chủ ngữ',c:'purpose',ab:'CN',h:'Chủ ngữ trả lời câu hỏi Ai? Cái gì? Con gì?'},vn:{n:'vị ngữ',c:'place',ab:'VN',h:'Vị ngữ trả lời câu hỏi Làm gì? Thế nào? Là gì?'}};
 const PHASES=['tn','cn','vn'],RLET={t:'tn',c:'cn',v:'vn'};
 BUILD['tham-tu']=()=>{
-  G.sents=pickK(bank('tham-tu'),PER['tham-tu']).map(s=>s.split('|').map(x=>[x.slice(2),RLET[x[0]]]));
+  G.sents=pickK(qbank('tham-tu'),PER['tham-tu']).map(s=>s.split('|').map(x=>[x.slice(2),RLET[x[0]]]));
   G.n=G.sents.length;G.ph=0;G.tried=[];
   G.view=()=>{
     if(G.i>=G.n)return renderEnd();
@@ -346,7 +354,7 @@ const PAIRS=[
 ];
 BUILD['ghep-cau']=()=>quiz('ghep-cau',([s1,s2,tpl,ans,why])=>{
   const fill=(A,a,b)=>tpl.replace('{A}',A).replace('{a}',a).replace('{b}',b);
-  return {intro:`<div class="pair-src"><span>Câu 1: ${s1}</span><span>Câu 2: ${s2}</span></div><p class="ask">Chọn cặp quan hệ từ để nối hai câu thành một câu ghép.</p>`,
+  return {intro:`<div class="pair-src"><span>Câu 1: ${s1}</span><span>Câu 2: ${s2}</span></div><p class="ask">Chọn cặp kết từ để nối hai câu thành một câu ghép.</p>`,
     options:PAIRS.map((p,k)=>({label:`${cap(p.a)} … ${p.b}`,ok:k===+ans,pair:p,why:k===+ans?(why||p.d):`Cặp “${p.a} … ${p.b}” dùng cho quan hệ ${p.k}. Hai câu này có quan hệ đó không? Thử cặp khác nhé.`})),
     view:o=>{if(!o)return fill(BLANK,BLANK,BLANK);const w=t=>`<span class="pt ${o.ok?'good':'bad'}">${t}</span>`;return fill(w(cap(o.pair.a)),w(o.pair.a),w(o.pair.b))}};
 });
@@ -382,7 +390,7 @@ BUILD['cam-thu']=()=>quiz('cam-thu',([lines,by,q,r,wr,w1,y1,w2,y2])=>({intro:'<p
 
 /* ---------- Nối đôi bạn thân ---------- */
 BUILD['noi-doi']=()=>{
-  G.sets=pickK(bank('noi-doi'),PER['noi-doi']).map(s=>s.split(';').map(p=>p.split('=')));
+  G.sets=pickK(qbank('noi-doi'),PER['noi-doi']).map(s=>s.split(';').map(p=>p.split('=')));
   G.n=G.sets.length;
   const init=()=>{const m=(G.sets[G.i]||[]).length;G.left=shuffle([...Array(m).keys()]);G.right=shuffle([...Array(m).keys()]);G.selL=null;G.matched=[];G.miss=[]};init();
   G.view=()=>{
@@ -426,7 +434,7 @@ BUILD['thanh-ngu']=()=>quiz('thanh-ngu',([text,ans,mean,d1,d2])=>{
 
 /* ---------- Xếp đoạn văn ---------- */
 BUILD['xep-doan']=()=>{
-  G.paras=pickK(rows('xep-doan'),PER['xep-doan']).map(([topic,...s])=>({topic,s}));
+  G.paras=pickK(qrows('xep-doan'),PER['xep-doan']).map(([topic,...s])=>({topic,s}));
   G.n=G.paras.length;
   const init=()=>{if(G.i<G.n)G.order=shuffle(G.paras[G.i].s.map((_,j)=>j));G.placed=[];G.miss=false};init();
   G.view=()=>{
@@ -454,7 +462,7 @@ const reW=w=>new RegExp(BND+'('+w.replace(/ /g,'\\s+')+')'+END,'iu');
 const reSS=new RegExp(BND+'(giống như|hệt như|tựa như|như là|tựa|như)'+END,'iu');
 const reLK=/^(vì vậy|vì thế|do đó|do vậy|tuy nhiên|ngoài ra|bên cạnh đó|trước hết|trước tiên|đầu tiên|tiếp theo|tiếp đó|sau đó|cuối cùng|tóm lại|nhìn chung|hơn nữa|thật vậy|mặt khác|nhờ vậy|nhờ đó|rồi)(?=[\s,])/iu;
 const NEED={tn:{n:'Trạng ngữ',h:'Thử mở đầu một câu bằng cụm chỉ thời gian hoặc nơi chốn, ví dụ: “Mỗi sáng đến trường, …”'},
-  gh:{n:'Câu ghép có cặp quan hệ từ',h:'Thử dùng: “Tuy … nhưng …”, “Vì … nên …”, “Không những … mà còn …”'},
+  gh:{n:'Câu ghép có cặp kết từ',h:'Thử dùng: “Tuy … nhưng …”, “Vì … nên …”, “Không những … mà còn …”'},
   ss:{n:'Hình ảnh so sánh',h:'Thử dùng từ “như”, “tựa như”, “giống như” để so sánh.'},
   lk:{n:'Từ ngữ nối liên kết câu',h:'Thử mở đầu câu bằng “Trước hết”, “Bên cạnh đó”, “Vì vậy”, “Cuối cùng”…'}};
 function analyze(text){
@@ -480,7 +488,7 @@ function checks(a){const D=G.de;return [
   {ok:a.n>=D.min&&a.n<=D.max,t:`Số câu: ${a.n} (đề yêu cầu ${D.min}–${D.max} câu)`,h:a.n<D.min?'Viết thêm vài câu nữa cho đủ ý.':a.n>D.max?'Đoạn văn hơi dài, thử gộp hoặc bớt câu.':''},
   ...D.needs.map(k=>({ok:a.c[k]>0,t:`${NEED[k].n}: ${a.c[k]}`,h:NEED[k].h}))]}
 BUILD['thi-thu']=()=>{
-  const all=rows('thi-thu');
+  const all=qrows('thi-thu');
   G.newDe=()=>{const sub=new Set((essays||[]).map(e=>e.de)),fresh=all.filter(r=>!sub.has(r[0])),pool=fresh.length?fresh:all;const [de,min,max,needs]=pool[Math.floor(Math.random()*pool.length)];G.de={de,min:+min,max:+max,needs:needs.split(',').filter(k=>NEED[k])};G.text=''};
   G.newDe();
   G.view=()=>{
@@ -494,7 +502,7 @@ BUILD['thi-thu']=()=>{
       <div class="split">
         <div class="panel"><h3>Bảng kiểm tra</h3><ul class="checks" id="checks"></ul></div>
         <div class="panel"><h3>Bài của bé, đã tô màu</h3><div class="preview" id="preview"></div>
-          <div class="legend" style="margin-top:8px"><mark class="m-tn">trạng ngữ</mark><mark class="m-gh">quan hệ từ</mark><mark class="m-ss">so sánh</mark><mark class="m-lk">từ nối</mark></div></div>
+          <div class="legend" style="margin-top:8px"><mark class="m-tn">trạng ngữ</mark><mark class="m-gh">kết từ</mark><mark class="m-ss">so sánh</mark><mark class="m-lk">từ nối</mark></div></div>
       </div>
       <p class="fine">Máy chỉ kiểm tra các yêu cầu hình thức của đề. Nội dung, ý hay và chính tả cần thầy cô hoặc bố mẹ đọc lại.</p>
       <div id="essays"></div></div>`;
@@ -521,7 +529,7 @@ function submitThi(){
     if(!first&&!gain)toast(0,'Bài chưa tăng sao so với lần trước · không cộng xu')}
   const lines=groupLines(G.xuLines),delta=G.xu;G.xuLines=[];
   document.getElementById('result').innerHTML=`<div class="msg ${st===3?'ok':'weak'}"><b>${stars(st)}</b><span>${st===3?'Bài làm đạt đủ yêu cầu của đề. Giỏi lắm!':`Bài làm đạt ${met}/${n} yêu cầu. Xem bảng kiểm tra để sửa và nộp lại nhé.`}${isStudent()?' Bài đã được lưu, thầy cô sẽ đọc và nhận xét.':isStaff()?' (Chơi thử: bài không được lưu.)':''}</span></div>${isStaff()?'':`<div class="xu-sum" id="xusum">${xuSumHtml(lines,delta,null)}</div>`}`;
-  saveRound('thi-thu',st,isStudent()?{de:G.de.de,text:G.text}:undefined).then(r=>{const el=document.getElementById('xusum');if(el)el.innerHTML=xuSumHtml(lines,delta,r)});
+  saveRound(G.g.id,st,isStudent()?{de:G.de.de,text:G.text}:undefined).then(r=>{const el=document.getElementById('xusum');if(el)el.innerHTML=xuSumHtml(lines,delta,r)});
 }
 function renderEssays(){
   const el=document.getElementById('essays');if(!el)return;
@@ -533,7 +541,7 @@ function renderEssays(){
 const WK={n:{n:'Danh từ',c:'place',h:'Danh từ chỉ sự vật: người, con vật, đồ vật, cây cối, hiện tượng, khái niệm.'},v:{n:'Động từ',c:'time',h:'Động từ chỉ hoạt động, trạng thái; thường đi sau “đã, đang, sẽ”.'},t:{n:'Tính từ',c:'manner',h:'Tính từ chỉ đặc điểm, tính chất như màu sắc, hình dáng, tính nết; thường đi sau “rất”.'},r:{n:'Đại từ',c:'purpose',h:'Đại từ dùng để xưng hô (tôi, chúng em, nó, họ), để hỏi (ai, gì, đâu) hoặc để thay thế.'}};
 const parseTags=s=>{const out=[];let last=0;s.replace(/\{([^|}]+)\|([nvtr])\}/g,(m,w,k,i)=>{if(i>last)out.push({x:s.slice(last,i)});out.push({w,k});last=i+m.length;return m});if(last<s.length)out.push({x:s.slice(last)});return out};
 BUILD['phan-loai']=()=>{
-  G.sents=pickK(bank('phan-loai'),PER['phan-loai']).map(parseTags);G.n=G.sents.length;
+  G.sents=pickK(qbank('phan-loai'),PER['phan-loai']).map(parseTags);G.n=G.sents.length;
   const reset=()=>{G.sel=null;G.placed={};G.miss={};G.msg=null};reset();
   G.view=()=>{
     if(G.i>=G.n)return renderEnd();
@@ -559,7 +567,7 @@ BUILD['phan-loai']=()=>{
 /* ---------- Một từ, nhiều nghĩa ---------- */
 const hl=s=>s.replace(/\*([^*]+)\*/g,'<span class="nhu">$1</span>');
 BUILD['nhieu-nghia']=()=>{
-  const all=bank('nhieu-nghia'),sets=all.filter(s=>!s.startsWith('P|')),pairs=all.filter(s=>s.startsWith('P|')),qs=[];
+  const all=qbank('nhieu-nghia'),sets=all.filter(s=>!s.startsWith('P|')),pairs=all.filter(s=>s.startsWith('P|')),qs=[];
   pickNew(sets,2,s=>all.indexOf(s)).forEach(s=>{const [w,gloss,...ss]=s.split('|');shuffle(ss).forEach(x=>{const [sent,a]=x.split('=');
     qs.push({intro:`<p class="ask">Từ <b>“${w}”</b> trong câu dưới đây mang nghĩa gốc hay nghĩa chuyển?</p>`,
       options:[opt('Nghĩa gốc',a==='g',a==='g'?`Đây là nghĩa gốc của “${w}”: ${gloss}.`:`Nghĩa gốc của “${w}” là ${gloss}. Ở câu này, từ đã chuyển sang chỉ sự vật khác có nét giống.`),
@@ -574,7 +582,7 @@ BUILD['nhieu-nghia']=()=>{
 
 /* ---------- Cặp từ đối đầu ---------- */
 BUILD['cap-tu']=()=>{
-  const all=rows('cap-tu').map((r,ix)=>Object.assign(r,{ix})),pairs=all.filter(r=>r[0]!=='T'),tones=all.filter(r=>r[0]==='T');
+  const all=qrows('cap-tu').map((r,ix)=>Object.assign(r,{ix})),pairs=all.filter(r=>r[0]!=='T'),tones=all.filter(r=>r[0]==='T');
   const pp=pickNew(pairs,4,r=>r.ix),tt=pickNew(tones,2,r=>r.ix);G.rowKeys=[...pp,...tt].map(r=>r.ix);
   G.items=[...pp.map(([w,s,a,d])=>({type:'p',w,s,a,chips:shuffle([s,a,...d.split(',')])})),
     ...tt.map(([,sent,r,why,w1,y1,w2,y2])=>({type:'t',sent,ans:r,chips:shuffle([r,w1,w2]),why:{[r]:why,[w1]:y1,[w2]:y2}}))];
@@ -607,7 +615,7 @@ BUILD['cap-tu']=()=>{
 
 /* ---------- Thợ săn chính tả ---------- */
 BUILD['chinh-ta']=()=>{
-  G.items=pickK(rows('chinh-ta'),PER['chinh-ta']).map(([s,tip,d])=>{
+  G.items=pickK(qrows('chinh-ta'),PER['chinh-ta']).map(([s,tip,d])=>{
     const m=/\{([^>}]+)>([^}]+)\}/.exec(s),pre=s.slice(0,m.index),post=s.slice(m.index+m[0].length),sp=t=>t.split(/(\s+)/).filter(x=>x).map(x=>({x}));
     return {toks:[...sp(pre),{x:m[1],bad:true},...sp(post)],wrong:m[1],right:m[2],tip,opts:shuffle([m[2],m[1],d])};
   });
@@ -643,7 +651,7 @@ const MARKS=['.',',','?','!',':',';','–','“','”','(',')'];
 const MHINT={'.':'Dấu chấm đặt cuối câu kể.',',':'Dấu phẩy ngăn trạng ngữ với chủ ngữ – vị ngữ, ngăn các từ cùng loại, ngăn các vế câu ghép, hoặc đặt sau từ cảm thán.','?':'Dấu chấm hỏi đặt cuối câu hỏi.','!':'Dấu chấm than đặt cuối câu cảm hoặc câu khiến.',':':'Dấu hai chấm báo hiệu phần liệt kê, giải thích hoặc lời nói trực tiếp đứng sau.',';':'Dấu chấm phẩy ngăn các vế câu ghép có cấu tạo giống nhau.','–':'Dấu gạch ngang đánh dấu phần chú thích hoặc nối các tên trong một liên danh.','“':'Dấu ngoặc kép mở đầu lời nói trực tiếp hoặc tên tác phẩm.','”':'Dấu ngoặc kép đóng lại lời nói trực tiếp hoặc tên tác phẩm.','(':'Dấu ngoặc đơn mở đầu phần chú thích.',')':'Dấu ngoặc đơn đóng lại phần chú thích.'};
 const KIEU={ke:['Câu kể','Câu kể dùng để kể, tả, giới thiệu; cuối câu thường có dấu chấm.'],hoi:['Câu hỏi','Câu hỏi dùng để hỏi điều chưa biết; cuối câu có dấu chấm hỏi.'],cam:['Câu cảm','Câu cảm bộc lộ cảm xúc, thường có “ôi, chà, trời ơi…”; cuối câu có dấu chấm than.'],khien:['Câu khiến','Câu khiến dùng để yêu cầu, đề nghị, khuyên bảo, thường có “hãy, đừng, nhé, đi, thôi”.']};
 BUILD['dau-cau']=()=>{
-  G.items=pickK(rows('dau-cau'),PER['dau-cau']).map(([s,kind])=>{const parts=[];let last=0;s.replace(/\{([^}]+)\}/g,(m,mk,i)=>{parts.push({x:s.slice(last,i)});parts.push({m:mk});last=i+m.length;return m});parts.push({x:s.slice(last)});return {parts,kind}});
+  G.items=pickK(qrows('dau-cau'),PER['dau-cau']).map(([s,kind])=>{const parts=[];let last=0;s.replace(/\{([^}]+)\}/g,(m,mk,i)=>{parts.push({x:s.slice(last,i)});parts.push({m:mk});last=i+m.length;return m});parts.push({x:s.slice(last)});return {parts,kind}});
   G.n=G.items.length;const reset=()=>{G.k=0;G.missed=false;G.kdone=false;G.tried=[];G.msg=null};reset();
   G.view=()=>{
     if(G.i>=G.n)return renderEnd();
@@ -677,7 +685,7 @@ BUILD['dau-cau']=()=>{
 const READ_MISS='Đọc lại đoạn văn và tìm chi tiết liên quan nhé.';
 BUILD['doc-hieu']=()=>{
   const qs=[];
-  pickNew(rows('doc-hieu').map((r,ix)=>Object.assign(r,{ix})),PER['doc-hieu'],r=>r.ix).forEach(row=>{const [p,by,qq]=row,qa=qq.split('#');qa.forEach((q,n)=>{const [qt,r,why,w1,w2]=q.split('~');
+  pickNew(qrows('doc-hieu').map((r,ix)=>Object.assign(r,{ix})),PER['doc-hieu'],r=>r.ix).forEach(row=>{const [p,by,qq]=row,qa=qq.split('#');qa.forEach((q,n)=>{const [qt,r,why,w1,w2]=q.split('~');
     qs.push({key:row.ix,intro:`<p class="ask">Đọc kĩ đoạn văn rồi trả lời câu hỏi ${n+1}/${qa.length}.</p>`,col:true,
       options:shuffle([opt(r,true,why),opt(w1,false,READ_MISS),opt(w2,false,READ_MISS)]),
       view:()=>`<div class="poem passage">${esc(p).split('/').join('<br>')}${by?`<div class="by">${esc(by)}</div>`:''}<div class="q">${esc(qt)}</div></div>`})})});
@@ -809,6 +817,8 @@ function badgeList(x,ess){
   const st=(x&&x.stats)||{},sv=st.solved||{},E=ess||[],out=[];
   for(const g of GAMEB()){const n=bank(g.id).length,got=(sv[g.id]||[]).length;
     TIERS.forEach(([k,name,p])=>{const need=Math.ceil(n*p);out.push({id:g.id+'-'+k,grp:'Bộ câu hỏi',tier:k,isl:g.is,name:name+' · '+g.name,how:`Trả lời đúng ngay lần đầu ${need}/${n} câu khác nhau của trò ${g.name}.`,have:Math.min(got,need),need,ok:got>=need})})}
+  for(const g of NCG().filter(g=>g.base!=='thi-thu')){const n=bank(g.id).length,got=(sv[g.id]||[]).length;
+    TIERS.forEach(([k,name,p])=>{const need=Math.ceil(n*p);out.push({id:g.id+'-'+k,grp:'Bộ câu hỏi Nâng cao',tier:k,isl:g.is,name:name+' Nâng cao · '+g.name,how:`Trả lời đúng ngay lần đầu ${need}/${n} câu Nâng cao của trò ${g.name}.`,have:Math.min(got,need),need,ok:got>=need})})}
   ISLANDS.forEach((isl,k)=>{const gs=GAMEB().filter(g=>g.is===k),has=tier=>gs.filter(g=>out.find(b=>b.id===g.id+'-'+tier).ok).length;
     out.push({id:'isl'+k+'-1',grp:'Đảo',tier:'bac',isl:k,name:'Nhà thám hiểm '+isl.name,how:`Có huy hiệu Đồng ở cả ${gs.length} trò của ${isl.name}.`,have:has('dong'),need:gs.length,ok:has('dong')===gs.length});
     out.push({id:'isl'+k+'-2',grp:'Đảo',tier:'vang',isl:k,name:'Chúa đảo '+isl.name.replace('Đảo ',''),how:`Có huy hiệu Vàng ở cả ${gs.length} trò của ${isl.name}.`,have:has('vang'),need:gs.length,ok:has('vang')===gs.length})});
@@ -823,7 +833,7 @@ function badgeList(x,ess){
   out.push({id:'king',grp:'Tối thượng',tier:'vang',name:'Vua Đảo Câu Văn',how:'Có đủ 5 huy hiệu Chúa đảo.',have:kings,need:5,ok:kings>=5});
   return out;
 }
-function BREWARD(id){let m=/^([a-z-]+)-(dong|bac|vang)$/.exec(id);if(m)return {dong:50,bac:100,vang:200}[m[2]];m=/^isl(\d)-([12])$/.exec(id);if(m)return m[2]==='1'?150:300;return {streak10:100,streak20:200,streak30:300,perfect5:200,days7:150,days30:300,write5:100,praised:150,write3s:200,king:1000}[id]||0}
+function BREWARD(id){let m=/-nc-(dong|bac|vang)$/.exec(id);if(m)return {dong:100,bac:200,vang:400}[m[1]];m=/^([a-z-]+)-(dong|bac|vang)$/.exec(id);if(m)return {dong:50,bac:100,vang:200}[m[2]];m=/^isl(\d)-([12])$/.exec(id);if(m)return m[2]==='1'?150:300;return {streak10:100,streak20:200,streak30:300,perfect5:200,days7:150,days30:300,write5:100,praised:150,write3s:200,king:1000}[id]||0}
 function badgeHtml(b,paid){const n=BREWARD(b.id);return `<div class="bdg ${b.ok?'on':'off'} t-${b.tier}"><span class="medal">${b.ok?MEDAL:LOCK}</span><b>${esc(b.name)}</b><span class="fine">${esc(b.how)}</span>${b.ok?'<span class="fine got">Đã mở khóa</span>':`<div class="meter sm"><div style="width:${Math.round(b.have/b.need*100)}%"></div></div><span class="fine">${b.have}/${b.need}</span>`}<span class="rw">${b.ok?((paid||[]).includes(b.id)?`Đã nhận ${vn(n)} xu`:`Sẽ nhận ${vn(n)} xu sau lượt chơi tới`):`Thưởng ${vn(n)} xu`}</span></div>`}
 function gameBadgeCard(g,sv){const n=bank(g.id).length,got=(sv[g.id]||[]).length;
   return `<div class="gbdg c${g.is}"><b>${g.name}</b><div class="meter sm"><div style="width:${Math.round(got/n*100)}%"></div></div><span class="fine">${got}/${n} câu đã chinh phục</span><span class="pips">${TIERS.map(([k,name,p])=>`<span class="pip t-${k}${got>=Math.ceil(n*p)?' on':''}" title="${name}: ${Math.ceil(n*p)} câu">${name}</span>`).join('')}</span></div>`}
@@ -832,7 +842,8 @@ function badgePanel(x,ess){
   return `<p class="bsum">${MEDAL}<b>${L.filter(b=>b.ok).length}</b>/${L.length} huy hiệu</p>
     <h3 class="bgrp">Bộ câu hỏi</h3><p class="fine">Mỗi câu chỉ tính một lần, khi trả lời đúng ngay lần đầu (trò nhiều bước: đúng hết các bước). Đồng: 40% số câu của trò, Bạc: 70%, Vàng: tất cả. Thưởng: Đồng 50 xu, Bạc 100 xu, Vàng 200 xu.</p>
     <div class="gbdgs">${GAMEB().map(g=>gameBadgeCard(g,sv)).join('')}</div>
-    ${[...new Set(L.filter(b=>b.grp!=='Bộ câu hỏi').map(b=>b.grp))].map(gp=>`<h3 class="bgrp">${gp}</h3><div class="bdgs">${L.filter(b=>b.grp===gp).map(b=>badgeHtml(b,(x&&x.paid)||[])).join('')}</div>`).join('')}`;
+    ${NCG().some(g=>g.base!=='thi-thu')?`<h3 class="bgrp">Bộ câu hỏi Nâng cao</h3><p class="fine">Tính riêng câu Nâng cao của mỗi trò. Đồng: 40%, Bạc: 70%, Vàng: tất cả. Thưởng gấp đôi: Đồng 100 xu, Bạc 200 xu, Vàng 400 xu.</p><div class="gbdgs">${NCG().filter(g=>g.base!=='thi-thu').map(g=>gameBadgeCard(g,sv)).join('')}</div>`:''}
+    ${[...new Set(L.filter(b=>!b.grp.startsWith('Bộ câu hỏi')).map(b=>b.grp))].map(gp=>`<h3 class="bgrp">${gp}</h3><div class="bdgs">${L.filter(b=>b.grp===gp).map(b=>badgeHtml(b,(x&&x.paid)||[])).join('')}</div>`).join('')}`;
 }
 function renderBadges(){
   G=null;
@@ -901,7 +912,7 @@ function route(){
   if(h==='theo-doi'||h.startsWith('hs-'))return renderDash(h);
   if(h==='qua')return renderShelf();
   if(h==='huy-hieu')return renderBadges();
-  const g=GAMES.find(x=>x.id===h);if(g)startGame(g);else renderMap();window.scrollTo(0,0);
+  const g=GAMES.find(x=>x.id===h)||NCG().find(x=>x.id===h);if(g)startGame(g);else renderMap();window.scrollTo(0,0);
 }
 addEventListener('hashchange',route);
 $app.innerHTML='<p class="fine">Đang tải…</p>';

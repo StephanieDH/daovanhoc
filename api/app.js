@@ -13,7 +13,9 @@ const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || '');
 const LOCAL = process.env.DCV_LOCAL === '1';
 const T = 'dcv_progress';
 const DAY = 86400000;
-const GAME_IDS = ['cay-cau','tau-chu','tham-tu','ghep-cau','cau-noi','sua-cau','so-sanh','nhan-hoa','cam-thu','noi-doi','kinh-lup','tu-lay','thanh-ngu','xep-doan','thi-thu','dau-cau','phan-loai','nhieu-nghia','cap-tu','chinh-ta','doc-hieu'];
+const GAME_BASE = ['cay-cau','tau-chu','tham-tu','ghep-cau','cau-noi','sua-cau','so-sanh','nhan-hoa','cam-thu','noi-doi','kinh-lup','tu-lay','thanh-ngu','xep-doan','thi-thu','dau-cau','phan-loai','nhieu-nghia','cap-tu','chinh-ta','doc-hieu'];
+const GAME_IDS = [...GAME_BASE, ...GAME_BASE.map(g => g + '-nc')];
+const isThi = g => g === 'thi-thu' || g === 'thi-thu-nc';
 
 class Bad extends Error { constructor(msg, status = 400) { super(msg); this.status = status; } }
 const bad = (m, s) => { throw new Bad(m, s); };
@@ -78,7 +80,9 @@ const xuOut = x => { x = x || {}; return { total: x.total || 0, peak: x.peak || 
 // Thưởng xu khi mở khóa huy hiệu (mỗi huy hiệu một lần). Danh sách huy hiệu do trình duyệt tính; máy chủ giữ mức thưởng.
 const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 100, praised: 150, write3s: 200, king: 1000 };
 function badgeReward(id) {
-  let m = /^([a-z-]+)-(dong|bac|vang)$/.exec(id);
+  let m = /^([a-z-]+)-nc-(dong|bac|vang)$/.exec(id);
+  if (m && GAME_BASE.includes(m[1]) && m[1] !== "thi-thu") return { dong: 100, bac: 200, vang: 400 }[m[2]];
+  m = /^([a-z-]+)-(dong|bac|vang)$/.exec(id);
   if (m && GAME_IDS.includes(m[1]) && m[1] !== "thi-thu") return { dong: 50, bac: 100, vang: 200 }[m[2]];
   m = /^isl([0-4])-([12])$/.exec(id); if (m) return m[2] === "1" ? 150 : 300;
   return BADGE_FIXED[id] || 0;
@@ -86,6 +90,9 @@ function badgeReward(id) {
 // Số câu (số dòng) của từng ngân hàng: phải khớp với data/*.js (cam-thu = 50 ở tu-tu.js + 20 ở dau-cau.js).
 const BANK_ROWS = { "cay-cau": 50, "tau-chu": 50, "tham-tu": 50, "dau-cau": 51, "ghep-cau": 50, "cau-noi": 50, "sua-cau": 52, "so-sanh": 50, "nhan-hoa": 50, "cam-thu": 70,
   "noi-doi": 13, "kinh-lup": 50, "tu-lay": 53, "thanh-ngu": 51, "phan-loai": 50, "nhieu-nghia": 52, "cap-tu": 57, "chinh-ta": 55, "xep-doan": 50, "doc-hieu": 50 };
+// Số dòng ngân hàng mức Nâng cao (data/nc-*.js) — chạy lại script khi thêm câu
+const BANK_ROWS_NC = {"cay-cau-nc":105,"dau-cau-nc":100,"tau-chu-nc":101,"tham-tu-nc":100};
+Object.assign(BANK_ROWS, BANK_ROWS_NC);
 const ISL_GAMES = [["cay-cau", "tau-chu", "tham-tu", "dau-cau"], ["ghep-cau", "cau-noi", "sua-cau"], ["so-sanh", "nhan-hoa", "cam-thu"],
   ["noi-doi", "kinh-lup", "tu-lay", "thanh-ngu", "phan-loai", "nhieu-nghia", "cap-tu", "chinh-ta"], ["xep-doan", "doc-hieu"]];
 // Máy chủ tự kiểm tra điều kiện của huy hiệu trước khi thưởng xu
@@ -162,7 +169,7 @@ async function handle(req, res) {
     const x = { ...(p.xu || {}) }, bonus = [];
     let delta = Math.max(-500, Math.min(900, parseInt(body.xu, 10) || 0));
     // thi thử: mỗi đề được tối đa +20 (lần nộp đầu) + 10 mỗi sao vượt kỷ lục cũ của đề + 30 (lần đầu đạt 3 sao)
-    if (game === 'thi-thu' && body.essay) {
+    if (isThi(game) && body.essay) {
       const de = String(body.essay.de || '').slice(0, 300), old = (p.essays || []).filter(e => e.de === de), prev = Math.max(0, ...old.map(e => e.stars || 0));
       const cap = (old.length ? 0 : 20) + 10 * Math.max(0, stars - prev) + (stars === 3 && prev < 3 ? 30 : 0);
       delta = Math.min(delta, cap);
@@ -176,12 +183,12 @@ async function handle(req, res) {
     x.total = Math.max(0, (x.total || 0) + delta + bonus.reduce((a, b) => a + b[1], 0)); x.peak = Math.max(x.peak || 0, x.total);
     // thống kê cho huy hiệu: các câu (số thứ tự trong ngân hàng) đã trả lời đúng ngay lần đầu, chuỗi dài nhất, số lượt hoàn hảo
     const sv = (Array.isArray(body.solved) ? body.solved : []).map(n => parseInt(n, 10)).filter(n => n >= 0 && n < (BANK_ROWS[game] || 0)).slice(0, 50);
-    if (sv.length && game !== "thi-thu") { x.solved = { ...(x.solved || {}) }; x.solved[game] = [...new Set([...(x.solved[game] || []), ...sv])].sort((a, b) => a - b); }
+    if (sv.length && !isThi(game)) { x.solved = { ...(x.solved || {}) }; x.solved[game] = [...new Set([...(x.solved[game] || []), ...sv])].sort((a, b) => a - b); }
     x.maxStreak = Math.max(x.maxStreak || 0, Math.min(200, parseInt(body.maxStreak, 10) || 0));
-    if (body.perfect === true && game !== "thi-thu") x.perfect = (x.perfect || 0) + 1;
+    if (body.perfect === true && !isThi(game)) x.perfect = (x.perfect || 0) + 1;
     p.xu = x; p.bonus = bonus;
     p.essays = Array.isArray(p.essays) ? p.essays : [];
-    if (game === 'thi-thu' && body.essay && body.essay.text) {
+    if (isThi(game) && body.essay && body.essay.text) {
       p.essays = [{ at: new Date().toISOString(), de: String(body.essay.de || '').slice(0, 300), text: String(body.essay.text).slice(0, 5000), stars }, ...p.essays].slice(0, 50);
     }
     await progPut(p);
