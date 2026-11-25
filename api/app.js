@@ -75,7 +75,22 @@ const giftsOf = x => (Array.isArray(x && x.gifts) && x.gifts.length ? x.gifts : 
 const vnDay = (ms = Date.now()) => new Date(ms + 7 * 3600000).toISOString().slice(0, 10);
 function dayStreak(days, today) { const set = new Set(days); let n = 0, d = Date.parse(today + "T00:00:00Z"); while (set.has(new Date(d).toISOString().slice(0, 10))) { n++; d -= DAY; } return n; }
 function bestRun(days) { const s = [...new Set(days || [])].sort(); let best = 0, run = 0, prev = 0; for (const d of s) { const ms = Date.parse(d + "T00:00:00Z"); run = prev && ms - prev === DAY ? run + 1 : 1; prev = ms; best = Math.max(best, run); } return best; }
-const xuOut = x => { x = x || {}; return { total: x.total || 0, peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()),
+// Mục tiêu hôm nay: mỗi ngày chọn ngẫu nhiên (cố định theo ngày + mã học sinh) 1 trò/mức trong 5 phần bé làm được ít nhất
+function goalPick(p, code, day) {
+  const x = p.xu || {}, sv = x.solved || {}, E = Array.isArray(p.essays) ? p.essays : [];
+  const thi = nc => new Set(E.filter(e => !!e.nc === nc).map(e => e.de)).size / 50;
+  const ids = GAME_IDS.filter(g => isThi(g) || BANK_ROWS[g] > 0);
+  const r = ids.map(g => [g, isThi(g) ? thi(g.endsWith('-nc')) : (sv[g] || []).length / BANK_ROWS[g]]).filter(a => a[1] < 1);
+  const pool = (r.length ? r : ids.map(g => [g, 0])).sort((a, b) => a[1] - b[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 5);
+  let hsh = 0; for (const c of day + '|' + code) hsh = (hsh * 31 + c.charCodeAt(0)) >>> 0;
+  return pool[hsh % pool.length][0];
+}
+function ensureGoal(p, code) {   // trả về true nếu vừa đặt mục tiêu mới cho hôm nay
+  const day = vnDay(), x = p.xu || {};
+  if (x.goal && x.goal.day === day) return false;
+  p.xu = { ...x, goal: { day, game: goalPick(p, code, day), done: false } }; return true;
+}
+const xuOut = x => { x = x || {}; return { total: x.total || 0, goal: x.goal && x.goal.day === vnDay() ? x.goal : null, peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()),
   stats: { solved: x.solved || {}, maxStreak: x.maxStreak || 0, perfect: x.perfect || 0, bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
 // Thưởng xu khi mở khóa huy hiệu (mỗi huy hiệu một lần). Danh sách huy hiệu do trình duyệt tính; máy chủ giữ mức thưởng.
 const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 200, write2s: 300, write3s: 400, writeN5: 600, writeN10: 800, writeN20: 1200, king: 1000, legend: 3000 };
@@ -164,7 +179,8 @@ async function handle(req, res) {
   // Học sinh: tiến độ của chính mình, lưu sao và bài thi thử
   if (a === 'progress') {
     const me = need(await who(req), ['student']);
-    return out(report({ code: me.code, name: me.name, active: true }, await prog(me.code), false));
+    const p = await prog(me.code); if (ensureGoal(p, me.code)) await progPut(p);
+    return out(report({ code: me.code, name: me.name, active: true }, p, false));
   }
   if (a === 'save') {
     const me = need(await who(req), ['student']);
@@ -174,7 +190,9 @@ async function handle(req, res) {
     const prevStars = (p.best || {})[game] || 0;
     p.best = { ...(p.best || {}) }; if (!(p.best[game] >= stars)) p.best[game] = stars;
     // xu: phần cộng/trừ trong lượt chơi do trình duyệt gửi lên (giới hạn hợp lí), thưởng thêm do máy chủ tính
+    ensureGoal(p, me.code);
     const x = { ...(p.xu || {}) }, bonus = [];
+    if (x.goal && x.goal.day === vnDay() && x.goal.game === game && !x.goal.done) { bonus.push(["Hoàn thành mục tiêu hôm nay", 50]); x.goal = { ...x.goal, done: true }; }
     let delta = Math.max(-500, Math.min(game.endsWith('-nc') ? 3600 : 1800, parseInt(body.xu, 10) || 0));
     // thi thử: mỗi đề được tối đa +20 (lần nộp đầu) + 10 mỗi sao vượt kỷ lục cũ của đề + 30 (lần đầu đạt 3 sao)
     if (isThi(game) && body.essay) {

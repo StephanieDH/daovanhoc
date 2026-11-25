@@ -120,12 +120,18 @@ let G=null;
 function goalsHtml(L){
   const tot=xu.total||0,gifts=xu.gifts||[],g=gifts.find(x=>tot<x.m);
   const UNIT={'Bộ câu hỏi':'câu','Đảo':'trò','Chuỗi đúng':'câu liền','Hoàn hảo':'lượt','Chăm chỉ':'ngày','Viết văn':'bài','Tối thượng':'Chúa đảo'};
-  const b=L.filter(x=>!x.ok).sort((a,c)=>(c.have/c.need-a.have/a.need)||((a.need-a.have)-(c.need-c.have)))[0];
+  const b=L.filter(x=>!x.ok&&x.grp!=='Chăm chỉ').sort((a,c)=>(c.have/c.need-a.have/a.need)||((a.need-a.have)-(c.need-c.have)))[0];
   const giftRow=g?`<div class="gl"><span>Quà tiếp theo: <b>${esc(g.name)}</b> · còn ${vn(g.m-tot)} xu</span><div class="gbar"><i class="gold" style="width:${Math.min(100,Math.round(tot/g.m*100))}%"></i></div></div>`
     :gifts.length?'<div class="gl"><span>Em đã đủ xu cho mọi món quà. Vào Kệ quà để đổi nhé!</span></div>':'';
   const badgeRow=b?`<div class="gl"><span>Huy hiệu gần nhất: <b>${esc(b.name)}</b> · còn ${b.need-b.have} ${UNIT[b.grp]||''}</span><div class="gbar"><i style="width:${Math.round(b.have/b.need*100)}%"></i></div></div>`
     :'<div class="gl"><span>Em đã có đủ 80 huy hiệu. Tuyệt vời!</span></div>';
-  return `<div class="goals">${giftRow}${badgeRow}</div>`;
+  // chuỗi chăm học: số ngày chơi liên tiếp, mốc thưởng mỗi 7 ngày
+  const sk=xu.streak||0,left=7-(sk%7);
+  const streakRow=`<div class="gl"><span>Chuỗi chăm học: <b>🔥 ${sk} ngày liên tiếp</b> · ${sk&&sk%7===0?'vừa nhận +100 xu, giữ chuỗi nhé!':`còn ${left} ngày tới +100 xu`}</span><div class="gbar"><i class="flame" style="width:${Math.round((sk%7||(sk?7:0))/7*100)}%"></i></div></div>`;
+  // mục tiêu hôm nay (máy chủ chọn và giữ cố định trong ngày)
+  const gl=xu.goal,gg=gl&&([...GAMES,...NCG()].find(x=>x.id===gl.game));
+  const goalRow=gg?`<div class="gl"><span>Mục tiêu hôm nay</span><div class="goalbox"><span>Chơi 1 lượt <b>${esc(gg.name)}${gg.nc?' · Nâng cao':''}</b></span>${gl.done?'<span class="gdone">✓ Hoàn thành · +50 xu</span>':`<a class="primary sm" href="#${gg.id}">Chơi ngay →</a>`}</div><span class="fine">${gl.done?'Ngày mai sẽ có mục tiêu mới.':'Xong một lượt được thưởng +50 xu.'}</span></div>`:'';
+  return `<div class="goals">${giftRow}${badgeRow}${streakRow}${goalRow}</div>`;
 }
 function rulesHtml(cls){
   const R=[['up','+10','Đúng ngay lần đầu'],['up','+5','Đúng ở lần thử 2'],['dn','−2','Mỗi lần sai'],['gr','0','Câu đã làm đúng rồi'],['fl','+50','Đúng liền 5 câu'],['fl','+100','Đúng liền 10 câu'],['up','+10','Mỗi sao mới của trò'],['up','+15','Chơi mỗi ngày']];
