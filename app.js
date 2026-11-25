@@ -144,10 +144,12 @@ function acct(){
       <div class="row"><input id="login" class="plain-in" placeholder="Tên đăng nhập" autocomplete="username" aria-label="Tên đăng nhập"><input id="pw" class="plain-in" type="password" placeholder="Mật khẩu" autocomplete="current-password" aria-label="Mật khẩu"><button class="primary" type="submit">Đăng nhập</button></div><span class="fine err" id="err-t"></span></form>
   </div><p class="fine guest">${net==='off'?'Chưa kết nối được máy chủ. ':''}Chưa đăng nhập vẫn chơi thử được, nhưng sao và xu chỉ lưu trên máy này và chưa đổi được quà.</p>`;
 }
+// sao dạng chữ: sao đã đạt tô vàng, sao chưa đạt mờ
+const starTxt=n=>`<span class="sy">${'★'.repeat(n||0)}</span><span class="se">${'☆'.repeat(3-(n||0))}</span>`;
 function renderMap(){
   G=null;LV='';
   const NC=NCG(),total=[...GAMES,...NC].reduce((a,g)=>a+size(g.id),0),sv=((xu&&xu.stats)||{}).solved||{};
-  const pct=id=>{const n=bank(id).length;return n&&isStudent()&&baseId(id)!=='thi-thu'?' · xong '+Math.round(Math.min(1,(sv[id]||[]).length/n)*100)+'%':''},st3=n=>'★'.repeat(n||0)+'☆'.repeat(3-(n||0));
+  const pct=id=>{const n=bank(id).length;return n&&isStudent()&&baseId(id)!=='thi-thu'?' · xong '+Math.round(Math.min(1,(sv[id]||[]).length/n)*100)+'%':''},st3=starTxt;
   const card=g=>{const nc=NC.find(x=>x.base===g.id);if(!nc)return `<a class="island tinted c${g.is}" href="#${g.id}"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><p>${g.skill}</p><span class="count">${size(g.id)} ${unit(g.id)}</span>${stars(best[g.id]||0)}</a>`;
     return `<div class="island tinted c${g.is}"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><p>${g.skill}</p><div class="lvs"><a class="lv b" href="#${g.id}">Cơ bản · ${size(g.id)} ${unit(g.id)}<small>${st3(best[g.id])}${pct(g.id)}</small></a><a class="lv n" href="#${nc.id}">Nâng cao · ${size(nc.id)} ${unit(g.id)}<small>${st3(best[nc.id])}${pct(nc.id)}</small></a></div></div>`};
   $app.innerHTML=`<section class="hero"><h1>Chọn một trò chơi để luyện câu văn</h1>
@@ -760,7 +762,7 @@ function renderKid(st,o){
       <p class="lvsum">Câu đã làm đúng: <b>Cơ bản ${(q=>`${vn(q.got)}/${vn(q.n)} (${q.p}%)`)(lvSum(st.xu,false))}</b> · <b>Nâng cao ${(q=>`${vn(q.got)}/${vn(q.n)} (${q.p}%)`)(lvSum(st.xu,true))}</b></p>
       <div class="isl-sum">${p.map(x=>`<span class="isl-tag c${x.k}"><span class="isle-dot" aria-hidden="true"></span>${shortIsl(x.k)} ${x.got}/${x.max}</span>`).join('')}</div>
       ${weak.length?`<div class="msg weak"><b>Chưa đạt 2 sao:</b><span>${weak.join(', ')}.</span></div>`:'<div class="msg ok"><b>Tuyệt vời!</b><span>Bé đã đạt từ 2 sao trở lên ở mọi trò chơi.</span></div>'}
-      <div class="islands">${MIXED.map(g=>{const sv=((st.xu&&st.xu.stats)||{}).solved||{},nc=bank(g.id+'-nc').length,cnt=id=>g.id==='thi-thu'?'':`<span>${Math.min((sv[id]||[]).length,bank(id).length)}/${bank(id).length}</span>`,st3=n=>'★'.repeat(n||0)+'☆'.repeat(3-(n||0));
+      <div class="islands">${MIXED.map(g=>{const sv=((st.xu&&st.xu.stats)||{}).solved||{},nc=bank(g.id+'-nc').length,cnt=id=>g.id==='thi-thu'?'':`<span>${Math.min((sv[id]||[]).length,bank(id).length)}/${bank(id).length}</span>`,st3=starTxt;
         return nc?`<div class="island tinted c${g.is} mini"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><div class="lvrow"><span>Cơ bản ${st3(st.best[g.id])}</span>${cnt(g.id)}</div><div class="lvrow"><span>Nâng cao ${st3(st.best[g.id+'-nc'])}</span>${cnt(g.id+'-nc')}</div></div>`
           :`<div class="island tinted c${g.is} mini"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3>${stars(st.best[g.id]||0)}</div>`}).join('')}</div></div>
     <h2 class="sec">Xu và quà</h2><div class="board">${shelfHtml(st.xu,{code:st.code,canDecide:!!o.canGift})}${o.canGift?giftEditor(st):''}</div>
