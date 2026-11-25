@@ -701,6 +701,8 @@ BUILD['doc-hieu']=()=>{
 let DASH=null,TAB='hs';
 const ENG_APP='https://english-exam-web-roan.vercel.app';
 const islPct=b=>ISLANDS.map((_,k)=>{const gs=GAMES.filter(g=>g.is===k);return {k,got:gs.reduce((a,g)=>a+((b||{})[g.id]||0),0),max:gs.length*3}});
+// tổng sao gộp Cơ bản + Nâng cao của mỗi đảo (báo cáo học sinh)
+const islPctAll=b=>ISLANDS.map((_,k)=>{const ids=GAMES.filter(g=>g.is===k).flatMap(g=>bank(g.id+'-nc').length?[g.id,g.id+'-nc']:[g.id]);return {k,got:ids.reduce((a,id)=>a+((b||{})[id]||0),0),max:ids.length*3}});
 const fmtDate=s=>s?new Date(s).toLocaleDateString('vi-VN'):'chưa chơi';
 const shortIsl=k=>ISLANDS[k].name.replace('Đảo ','');
 async function renderDash(h){
@@ -758,9 +760,9 @@ function renderKid(st,o){
   G=null;
   const p=islPct(st.best),t=p.reduce((a,x)=>a+x.got,0),weak=GAMES.filter(g=>(st.best[g.id]||0)<2).map(g=>g.name);
   $app.innerHTML=`${o.back?'<div class="bar"><a class="back" href="#theo-doi">← Bảng theo dõi</a></div>':''}${o.top||''}
-    <div class="board"><div class="dhead"><h1>Báo cáo của ${esc(st.name)}</h1><span class="fine">Mã ${esc(st.code)} · chơi gần nhất: ${fmtDate(st.updated)} · ${t}/${GAMES.length*3} sao</span></div>
+    <div class="board"><div class="dhead"><h1>Báo cáo của ${esc(st.name)}</h1><span class="fine">Mã ${esc(st.code)} · chơi gần nhất: ${fmtDate(st.updated)} · <span class="sy">★</span> ${islPctAll(st.best).reduce((a,x)=>a+x.got,0)}/${islPctAll(st.best).reduce((a,x)=>a+x.max,0)} sao</span></div>
       <p class="lvsum">Câu đã làm đúng: <b>Cơ bản ${(q=>`${vn(q.got)}/${vn(q.n)} (${q.p}%)`)(lvSum(st.xu,false))}</b> · <b>Nâng cao ${(q=>`${vn(q.got)}/${vn(q.n)} (${q.p}%)`)(lvSum(st.xu,true))}</b></p>
-      <div class="isl-sum">${p.map(x=>`<span class="isl-tag c${x.k}"><span class="isle-dot" aria-hidden="true"></span>${shortIsl(x.k)} ${x.got}/${x.max}</span>`).join('')}</div>
+      <div class="isl-sum">${islPctAll(st.best).map(x=>`<span class="isl-tag c${x.k}"><span class="isle-dot" aria-hidden="true"></span>${shortIsl(x.k)} <span class="sy" aria-hidden="true">★</span> ${x.got}/${x.max} sao</span>`).join('')}</div>
       ${weak.length?`<div class="msg weak"><b>Chưa đạt 2 sao:</b><span>${weak.join(', ')}.</span></div>`:'<div class="msg ok"><b>Tuyệt vời!</b><span>Bé đã đạt từ 2 sao trở lên ở mọi trò chơi.</span></div>'}
       <div class="islands">${MIXED.map(g=>{const sv=((st.xu&&st.xu.stats)||{}).solved||{},nc=bank(g.id+'-nc').length,cnt=id=>g.id==='thi-thu'?'':`<span>${Math.min((sv[id]||[]).length,bank(id).length)}/${bank(id).length}</span>`,st3=starTxt;
         return nc?`<div class="island tinted c${g.is} mini"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><div class="lvrow"><span>Cơ bản ${st3(st.best[g.id])}</span>${cnt(g.id)}</div><div class="lvrow"><span>Nâng cao ${st3(st.best[g.id+'-nc'])}</span>${cnt(g.id+'-nc')}</div></div>`
