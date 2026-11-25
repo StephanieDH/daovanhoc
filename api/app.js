@@ -66,7 +66,7 @@ async function who(req) {
 const need = (me, roles) => { if (!me) bad('Hãy đăng nhập lại.', 401); if (!roles.includes(me.role)) bad('Tài khoản này không có quyền làm việc đó.', 403); return me; };
 
 // ---------- dữ liệu gửi về trình duyệt
-const essaysOut = es => (Array.isArray(es) ? es : []).map(e => ({ at: e.at, de: e.de, text: e.text, stars: e.stars, comment: e.comment || '', commentBy: e.commentBy || '', commentAt: e.commentAt || null }));
+const essaysOut = es => (Array.isArray(es) ? es : []).map(e => ({ at: e.at, de: e.de, text: e.text, stars: e.stars, nc: !!e.nc, comment: e.comment || '', commentBy: e.commentBy || '', commentAt: e.commentAt || null }));
 // ---------- xu và quà
 const DEFAULT_GIFTS = [
   { m: 1000, name: "1 bộ sticker" }, { m: 2000, name: "30 phút chơi game" },
@@ -78,7 +78,7 @@ function bestRun(days) { const s = [...new Set(days || [])].sort(); let best = 0
 const xuOut = x => { x = x || {}; return { total: x.total || 0, peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()),
   stats: { solved: x.solved || {}, maxStreak: x.maxStreak || 0, perfect: x.perfect || 0, bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
 // Thưởng xu khi mở khóa huy hiệu (mỗi huy hiệu một lần). Danh sách huy hiệu do trình duyệt tính; máy chủ giữ mức thưởng.
-const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 100, praised: 150, write3s: 200, king: 1000, legend: 3000 };
+const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 200, write2s: 300, write3s: 400, writeN5: 600, writeN10: 800, writeN20: 1200, king: 1000, legend: 3000 };
 // hệ số xu theo đảo: 0 Mở rộng câu ×1; 1 Câu ghép, 2 Tu từ, 3 Từ ngữ ×½; 4 Viết đoạn (gồm thi thử) ×2
 const ISL_MUL = [1, 0.5, 0.5, 0.5, 2];
 const gameIsl = g => { g = String(g).replace(/-nc$/, ''); if (g === 'thi-thu') return 4; const k = ISL_GAMES.findIndex(a => a.includes(g)); return k < 0 ? 0 : k; };
@@ -102,6 +102,7 @@ const ISL_GAMES = [["cay-cau", "tau-chu", "tham-tu", "dau-cau"], ["ghep-cau", "c
 // Máy chủ tự kiểm tra điều kiện của huy hiệu trước khi thưởng xu
 function earned(id, p) {
   const x = p.xu || {}, sv = x.solved || {}, E = Array.isArray(p.essays) ? p.essays : [];
+  const deN = f => new Set(E.filter(f).map(e => e.de)).size;  // số đề khác nhau
   const tierOk = (g, tier) => BANK_ROWS[g] > 0 && (sv[g] || []).length >= Math.ceil(BANK_ROWS[g] * { dong: 0.4, bac: 0.7, vang: 1 }[tier]);
   let m = /^([a-z-]+)-(dong|bac|vang)$/.exec(id); if (m) return tierOk(m[1], m[2]);
   m = /^isl([0-4])-([12])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g, m[2] === "1" ? "dong" : "vang"));
@@ -109,7 +110,8 @@ function earned(id, p) {
   switch (id) {
     case "streak10": return (x.maxStreak || 0) >= 10; case "streak20": return (x.maxStreak || 0) >= 20; case "streak30": return (x.maxStreak || 0) >= 30;
     case "perfect5": return (x.perfect || 0) >= 5; case "days7": return bestRun(x.days) >= 7; case "days30": return bestRun(x.days) >= 30;
-    case "write5": return E.length >= 5; case "praised": return E.filter(e => e.comment).length >= 3; case "write3s": return E.filter(e => e.stars === 3).length >= 5;
+    case "write5": return deN(() => true) >= 5; case "write2s": return deN(e => (e.stars || 0) >= 2) >= 5; case "write3s": return deN(e => e.stars === 3) >= 5;
+    case "writeN5": return deN(e => e.nc && e.stars === 3) >= 5; case "writeN10": return deN(e => e.nc && e.stars === 3) >= 10; case "writeN20": return deN(e => e.nc && e.stars === 3) >= 20;
     case "king": return [0, 1, 2, 3, 4].every(k => earned("isl" + k + "-2", p));
     case "legend": return [0, 1, 2, 3, 4].every(k => earned("nisl" + k + "-2", p));
   }
@@ -195,7 +197,7 @@ async function handle(req, res) {
     p.xu = x; p.bonus = bonus;
     p.essays = Array.isArray(p.essays) ? p.essays : [];
     if (isThi(game) && body.essay && body.essay.text) {
-      p.essays = [{ at: new Date().toISOString(), de: String(body.essay.de || '').slice(0, 300), text: String(body.essay.text).slice(0, 5000), stars }, ...p.essays].slice(0, 50);
+      p.essays = [{ at: new Date().toISOString(), de: String(body.essay.de || '').slice(0, 300), text: String(body.essay.text).slice(0, 5000), stars, nc: game.endsWith('-nc') }, ...p.essays].slice(0, 50);
     }
     await progPut(p);
     return out({ ...report({ code: me.code, name: me.name, active: true }, p, false), bonus: p.bonus });

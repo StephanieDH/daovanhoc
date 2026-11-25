@@ -840,17 +840,22 @@ function badgeList(x,ess){
   const ms=st.maxStreak||0;[[10,'Ngọn lửa nhỏ'],[20,'Ngọn lửa lớn'],[30,'Ngọn lửa bất diệt']].forEach(([n,name],i)=>out.push({id:'streak'+n,grp:'Chuỗi đúng',tier:TIERS[i][0],name,how:`Đúng liên tiếp ${n} câu trong một lượt chơi.`,have:Math.min(ms,n),need:n,ok:ms>=n}));
   out.push({id:'perfect5',grp:'Hoàn hảo',tier:'vang',name:'Không một lỗi',how:'Có 5 lượt chơi đúng hết ngay lần đầu.',have:Math.min(st.perfect||0,5),need:5,ok:(st.perfect||0)>=5});
   const bd=st.bestDays||0;[[7,'Chăm học 7 ngày','bac'],[30,'Chăm học 30 ngày','vang']].forEach(([n,name,tier])=>out.push({id:'days'+n,grp:'Chăm chỉ',tier,name,how:`Chơi liên tục ${n} ngày.`,have:Math.min(bd,n),need:n,ok:bd>=n}));
-  const sub=E.length,full=E.filter(e=>e.stars===3).length,cm=E.filter(e=>e.comment).length;
-  out.push({id:'write5',grp:'Viết văn',tier:'dong',name:'Cây bút nhỏ',how:'Nộp 5 bài thi thử.',have:Math.min(sub,5),need:5,ok:sub>=5});
-  out.push({id:'praised',grp:'Viết văn',tier:'bac',name:'Được cô khen',how:'Có 3 bài thi thử được thầy cô nhận xét.',have:Math.min(cm,3),need:3,ok:cm>=3});
-  out.push({id:'write3s',grp:'Viết văn',tier:'vang',name:'Cây bút vàng',how:'Có 5 bài thi thử đạt đủ yêu cầu của đề.',have:Math.min(full,5),need:5,ok:full>=5});
+  // chuỗi Viết văn: đếm số đề khác nhau (nộp lại cùng một đề chỉ tính một lần)
+  const de=f=>new Set(E.filter(f).map(e=>e.de)).size,sub=de(()=>true),s2=de(e=>(e.stars||0)>=2),full=de(e=>e.stars===3),nc3=de(e=>e.nc&&e.stars===3);
+  [['write5','dong','Content creator nhí','Nộp bài cho 5 đề thi thử khác nhau.',sub,5],
+   ['write2s','bac','Bài viết hot','Có 5 đề thi thử đạt từ 2 sao trở lên.',s2,5],
+   ['write3s','vang','Bài viết viral','Có 5 đề thi thử đạt đủ yêu cầu (3 sao).',full,5],
+   ['writeN5','titan','Bút Pro Max','Có 5 đề thi thử Nâng cao đạt 3 sao.',nc3,5],
+   ['writeN10','ruby','Idol viết văn','Có 10 đề thi thử Nâng cao đạt 3 sao.',nc3,10],
+   ['writeN20','kc','KOL văn chương','Có 20 đề thi thử Nâng cao đạt 3 sao.',nc3,20]]
+  .forEach(([id,tier,name,how,have,need])=>out.push({id,grp:'Viết văn',tier,name,how,have:Math.min(have,need),need,ok:have>=need}));
   const kings=out.filter(b=>/^isl\d-2$/.test(b.id)&&b.ok).length;
   out.push({id:'king',grp:'Tối thượng',tier:'vang',name:'Vua Đảo Câu Văn',how:'Có đủ 5 huy hiệu Chúa đảo.',have:kings,need:5,ok:kings>=5});
   const legends=out.filter(b=>/^nisl\d-2$/.test(b.id)&&b.ok).length;
   out.push({id:'legend',grp:'Tối thượng',tier:'kc',name:'Huyền thoại Đảo Câu Văn',how:'Có đủ 5 huy hiệu Trùm cuối (Diamond ở mọi trò).',have:legends,need:5,ok:legends>=5});
   return out;
 }
-function BREWARD(id){let m=/^([a-z-]+)-nc-(dong|bac|vang)$/.exec(id);if(m)return {dong:250,bac:300,vang:400}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^nisl(\d)-([123])$/.exec(id);if(m)return {1:400,3:500,2:600}[m[2]]*ISL_MUL[+m[1]];m=/^([a-z-]+)-(dong|bac|vang)$/.exec(id);if(m)return {dong:50,bac:100,vang:200}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^isl(\d)-([12])$/.exec(id);if(m)return (m[2]==='1'?150:300)*ISL_MUL[+m[1]];return {streak10:100,streak20:200,streak30:300,perfect5:200,days7:150,days30:300,write5:100,praised:150,write3s:200,king:1000,legend:3000}[id]||0}
+function BREWARD(id){let m=/^([a-z-]+)-nc-(dong|bac|vang)$/.exec(id);if(m)return {dong:250,bac:300,vang:400}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^nisl(\d)-([123])$/.exec(id);if(m)return {1:400,3:500,2:600}[m[2]]*ISL_MUL[+m[1]];m=/^([a-z-]+)-(dong|bac|vang)$/.exec(id);if(m)return {dong:50,bac:100,vang:200}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^isl(\d)-([12])$/.exec(id);if(m)return (m[2]==='1'?150:300)*ISL_MUL[+m[1]];return {streak10:100,streak20:200,streak30:300,perfect5:200,days7:150,days30:300,write5:200,write2s:300,write3s:400,writeN5:600,writeN10:800,writeN20:1200,king:1000,legend:3000}[id]||0}
 function badgeHtml(b,paid){const n=BREWARD(b.id);return `<div class="bdg ${b.ok?'on':'off'} t-${b.tier}"><span class="medal">${b.ok?MEDAL:LOCK}</span><b>${esc(b.name)}</b><span class="fine">${esc(b.how)}</span>${b.ok?'<span class="fine got">Đã mở khóa</span>':`<div class="meter sm"><div style="width:${Math.round(b.have/b.need*100)}%"></div></div><span class="fine">${b.have}/${b.need}</span>`}<span class="rw">${b.ok?((paid||[]).includes(b.id)?`Đã nhận ${vn(n)} xu`:`Sẽ nhận ${vn(n)} xu sau lượt chơi tới`):`Thưởng ${vn(n)} xu`}</span></div>`}
 function gameBadgeCard(g,sv){const n=bank(g.id).length,got=Math.min((sv[g.id]||[]).length,n),nid=g.id+'-nc',nn=bank(nid).length,ng=Math.min((sv[nid]||[]).length,nn);
   const bar=(lbl,a,t)=>`<div class="lvbar"><span>${lbl}</span><div class="meter sm"><div style="width:${t?Math.round(a/t*100):0}%"></div></div><span class="fine">${a}/${t}</span></div>`;
