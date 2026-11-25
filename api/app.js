@@ -78,7 +78,7 @@ function bestRun(days) { const s = [...new Set(days || [])].sort(); let best = 0
 const xuOut = x => { x = x || {}; return { total: x.total || 0, peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()),
   stats: { solved: x.solved || {}, maxStreak: x.maxStreak || 0, perfect: x.perfect || 0, bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
 // Thưởng xu khi mở khóa huy hiệu (mỗi huy hiệu một lần). Danh sách huy hiệu do trình duyệt tính; máy chủ giữ mức thưởng.
-const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 100, praised: 150, write3s: 200, king: 1000 };
+const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 100, praised: 150, write3s: 200, king: 1000, legend: 3000 };
 // hệ số xu theo đảo: 0 Mở rộng câu ×1; 1 Câu ghép, 2 Tu từ, 3 Từ ngữ ×½; 4 Viết đoạn (gồm thi thử) ×2
 const ISL_MUL = [1, 0.5, 0.5, 0.5, 2];
 const gameIsl = g => { g = String(g).replace(/-nc$/, ''); if (g === 'thi-thu') return 4; const k = ISL_GAMES.findIndex(a => a.includes(g)); return k < 0 ? 0 : k; };
@@ -111,6 +111,7 @@ function earned(id, p) {
     case "perfect5": return (x.perfect || 0) >= 5; case "days7": return bestRun(x.days) >= 7; case "days30": return bestRun(x.days) >= 30;
     case "write5": return E.length >= 5; case "praised": return E.filter(e => e.comment).length >= 3; case "write3s": return E.filter(e => e.stars === 3).length >= 5;
     case "king": return [0, 1, 2, 3, 4].every(k => earned("isl" + k + "-2", p));
+    case "legend": return [0, 1, 2, 3, 4].every(k => earned("nisl" + k + "-2", p));
   }
   return false;
 }
