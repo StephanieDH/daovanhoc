@@ -155,9 +155,9 @@ const starTxt=n=>`<span class="sy">${'★'.repeat(n||0)}</span><span class="se">
 function renderMap(){
   G=null;LV='';
   const NC=NCG(),total=[...GAMES,...NC].reduce((a,g)=>a+size(g.id),0),sv=((xu&&xu.stats)||{}).solved||{};
-  const pct=id=>{const n=bank(id).length;return n&&isStudent()&&baseId(id)!=='thi-thu'?' · xong '+Math.round(Math.min(1,(sv[id]||[]).length/n)*100)+'%':''},st3=starTxt;
+  const pct=id=>{const n=bank(id).length;return n&&isStudent()&&baseId(id)!=='thi-thu'?' · '+Math.round(Math.min(1,(sv[id]||[]).length/n)*100)+'%':''},st3=starTxt;
   const card=g=>{const nc=NC.find(x=>x.base===g.id);if(!nc)return `<a class="island tinted c${g.is}" href="#${g.id}"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><p>${g.skill}</p><span class="count">${size(g.id)} ${unit(g.id)}</span>${stars(best[g.id]||0)}</a>`;
-    return `<div class="island tinted c${g.is}"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><p>${g.skill}</p><div class="lvs"><a class="lv b" href="#${g.id}">Cơ bản · ${size(g.id)} ${unit(g.id)}<small>${st3(best[g.id])}${pct(g.id)}</small></a><a class="lv n" href="#${nc.id}">Nâng cao · ${size(nc.id)} ${unit(g.id)}<small>${st3(best[nc.id])}${pct(nc.id)}</small></a></div></div>`};
+    return `<div class="island tinted c${g.is}"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><p>${g.skill}</p><div class="lvs"><a class="lv b" href="#${g.id}"><b>Cơ bản</b><small>${size(g.id)} ${unit(g.id)} · ${st3(best[g.id])}${pct(g.id)}</small></a><a class="lv n" href="#${nc.id}"><b>Nâng cao</b><small>${size(nc.id)} ${unit(g.id)} · ${st3(best[nc.id])}${pct(nc.id)}</small></a></div></div>`};
   $app.innerHTML=`<section class="hero"><h1>Chọn một trò chơi để luyện câu văn</h1>
   <p>Mỗi màu là một hòn đảo kỹ năng. Bé chơi trò nào trước cũng được: làm câu dài hơn, hay hơn, rồi viết thành đoạn văn hoàn chỉnh.</p></section>
   ${acct()}
