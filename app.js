@@ -713,12 +713,15 @@ async function renderDash(h){
   $app.innerHTML=`<div class="dhead"><h1>Bảng theo dõi</h1><span class="fine">${esc(me.name)} · ${ROLE_VI[me.role]}</span><button class="ghost sm" data-act="d-refresh">Tải lại</button></div>
     <div class="tabs" role="tablist">${tabs.map(([k,t])=>`<button class="tab${TAB===k?' on':''}" role="tab" aria-selected="${TAB===k}" data-act="d-tab" data-k="${k}">${t}</button>`).join('')}</div>${body}`;
 }
+// tổng câu đã làm đúng (ngay lần đầu) của mức Cơ bản (nc=false) hoặc Nâng cao (nc=true), không tính thi thử
+function lvSum(x,nc){const sv=((x&&x.stats)||{}).solved||{},gs=nc?NCG().filter(g=>g.base!=='thi-thu'):GAMEB();
+  const n=gs.reduce((a,g)=>a+bank(g.id).length,0),got=gs.reduce((a,g)=>a+Math.min((sv[g.id]||[]).length,bank(g.id).length),0);return {n,got,p:n?Math.round(got/n*100):0}}
 function tableStudents(S){
   const act=S.filter(s=>s.active);
   if(!act.length)return `<div class="board"><p>Chưa có học sinh nào. Thêm học sinh trong <a href="${ENG_APP}" target="_blank" rel="noopener">app tiếng Anh</a>, mã sẽ tự có ở đây.</p></div>`;
-  return `<div class="tablewrap"><table class="dt"><thead><tr><th>Học sinh</th>${ISLANDS.map((x,k)=>`<th class="c${k}"><span class="isle-dot"></span>${shortIsl(k)}</th>`).join('')}<th>Sao</th><th>Xu</th><th>Huy hiệu</th><th>Chơi gần nhất</th></tr></thead><tbody>
+  return `<div class="tablewrap"><table class="dt"><thead><tr><th>Học sinh</th>${ISLANDS.map((x,k)=>`<th class="c${k}"><span class="isle-dot"></span>${shortIsl(k)}</th>`).join('')}<th>Sao</th><th>Nâng cao</th><th>Xu</th><th>Huy hiệu</th><th>Chơi gần nhất</th></tr></thead><tbody>
     ${act.map(s=>{const p=islPct(s.best),t=p.reduce((a,x)=>a+x.got,0),w=s.essays.filter(e=>!e.comment).length;
-      return `<tr class="link" data-act="d-open" data-code="${esc(s.code)}" tabindex="0"><td><b>${esc(s.name)}</b>${w?` <span class="badge" title="Bài chờ nhận xét">${w}</span>`:''}<br><span class="fine">${esc(s.code)}</span></td>${p.map(x=>`<td class="c${x.k}"><div class="pbar"><i style="width:${Math.round(x.got/x.max*100)}%"></i></div><span class="fine">${x.got}/${x.max}</span></td>`).join('')}<td><b>${t}</b>/${GAMES.length*3}</td><td>${vn(s.xu.total)}${(s.xu.req||[]).some(r=>r.status==='pending')?' <span class="badge soft">xin quà</span>':''}</td><td>${badgeList(s.xu,s.essays).filter(b=>b.ok).length}</td><td>${fmtDate(s.updated)}</td></tr>`}).join('')}
+      return `<tr class="link" data-act="d-open" data-code="${esc(s.code)}" tabindex="0"><td><b>${esc(s.name)}</b>${w?` <span class="badge" title="Bài chờ nhận xét">${w}</span>`:''}<br><span class="fine">${esc(s.code)}</span></td>${p.map(x=>`<td class="c${x.k}"><div class="pbar"><i style="width:${Math.round(x.got/x.max*100)}%"></i></div><span class="fine">${x.got}/${x.max}</span></td>`).join('')}<td><b>${t}</b>/${GAMES.length*3}</td>${(()=>{const q=lvSum(s.xu,true);return `<td><div class="pbar"><i style="width:${q.p}%"></i></div><span class="fine">${vn(q.got)}/${vn(q.n)} câu · ${q.p}%</span></td>`})()}<td>${vn(s.xu.total)}${(s.xu.req||[]).some(r=>r.status==='pending')?' <span class="badge soft">xin quà</span>':''}</td><td>${badgeList(s.xu,s.essays).filter(b=>b.ok).length}</td><td>${fmtDate(s.updated)}</td></tr>`}).join('')}
     </tbody></table></div><p class="fine">Bấm vào một học sinh để xem từng trò chơi, bài thi thử, xu và quà.</p>`;
 }
 function essayFeed(S){
@@ -751,9 +754,12 @@ function renderKid(st,o){
   const p=islPct(st.best),t=p.reduce((a,x)=>a+x.got,0),weak=GAMES.filter(g=>(st.best[g.id]||0)<2).map(g=>g.name);
   $app.innerHTML=`${o.back?'<div class="bar"><a class="back" href="#theo-doi">← Bảng theo dõi</a></div>':''}${o.top||''}
     <div class="board"><div class="dhead"><h1>Báo cáo của ${esc(st.name)}</h1><span class="fine">Mã ${esc(st.code)} · chơi gần nhất: ${fmtDate(st.updated)} · ${t}/${GAMES.length*3} sao</span></div>
+      <p class="lvsum">Câu đã làm đúng: <b>Cơ bản ${(q=>`${vn(q.got)}/${vn(q.n)} (${q.p}%)`)(lvSum(st.xu,false))}</b> · <b>Nâng cao ${(q=>`${vn(q.got)}/${vn(q.n)} (${q.p}%)`)(lvSum(st.xu,true))}</b></p>
       <div class="isl-sum">${p.map(x=>`<span class="isl-tag c${x.k}"><span class="isle-dot" aria-hidden="true"></span>${shortIsl(x.k)} ${x.got}/${x.max}</span>`).join('')}</div>
       ${weak.length?`<div class="msg weak"><b>Chưa đạt 2 sao:</b><span>${weak.join(', ')}.</span></div>`:'<div class="msg ok"><b>Tuyệt vời!</b><span>Bé đã đạt từ 2 sao trở lên ở mọi trò chơi.</span></div>'}
-      <div class="islands">${MIXED.map(g=>`<div class="island tinted c${g.is} mini"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3>${stars(st.best[g.id]||0)}</div>`).join('')}</div></div>
+      <div class="islands">${MIXED.map(g=>{const sv=((st.xu&&st.xu.stats)||{}).solved||{},nc=bank(g.id+'-nc').length,cnt=id=>g.id==='thi-thu'?'':`<span>${Math.min((sv[id]||[]).length,bank(id).length)}/${bank(id).length}</span>`,st3=n=>'★'.repeat(n||0)+'☆'.repeat(3-(n||0));
+        return nc?`<div class="island tinted c${g.is} mini"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><div class="lvrow"><span>Cơ bản ${st3(st.best[g.id])}</span>${cnt(g.id)}</div><div class="lvrow"><span>Nâng cao ${st3(st.best[g.id+'-nc'])}</span>${cnt(g.id+'-nc')}</div></div>`
+          :`<div class="island tinted c${g.is} mini"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3>${stars(st.best[g.id]||0)}</div>`}).join('')}</div></div>
     <h2 class="sec">Xu và quà</h2><div class="board">${shelfHtml(st.xu,{code:st.code,canDecide:!!o.canGift})}${o.canGift?giftEditor(st):''}</div>
     <h2 class="sec">Huy hiệu</h2><div class="board">${badgePanel(st.xu,st.essays)}</div>
     <h2 class="sec">Bài thi thử đã nộp (${st.essays.length})</h2>
