@@ -843,11 +843,11 @@ function badgeList(x,ess){
   // chuỗi Viết văn: đếm số đề khác nhau (nộp lại cùng một đề chỉ tính một lần)
   const de=f=>new Set(E.filter(f).map(e=>e.de)).size,sub=de(()=>true),s2=de(e=>(e.stars||0)>=2),full=de(e=>e.stars===3),nc3=de(e=>e.nc&&e.stars===3);
   [['write5','dong','Content creator nhí','Nộp bài cho 5 đề thi thử khác nhau.',sub,5],
-   ['write2s','bac','Bài viết hot','Có 5 đề thi thử đạt từ 2 sao trở lên.',s2,5],
-   ['write3s','vang','Bài viết viral','Có 5 đề thi thử đạt đủ yêu cầu (3 sao).',full,5],
-   ['writeN5','titan','Bút Pro Max','Có 5 đề thi thử Nâng cao đạt 3 sao.',nc3,5],
-   ['writeN10','ruby','Idol viết văn','Có 10 đề thi thử Nâng cao đạt 3 sao.',nc3,10],
-   ['writeN20','kc','KOL văn chương','Có 20 đề thi thử Nâng cao đạt 3 sao.',nc3,20]]
+   ['write2s','bac','Bài viết hot','Có 10 đề thi thử đạt từ 2 sao trở lên.',s2,10],
+   ['write3s','vang','Bài viết viral','Có 10 đề thi thử đạt đủ yêu cầu (3 sao).',full,10],
+   ['writeN5','titan','Bút Pro Max','Có 10 đề thi thử Nâng cao đạt 3 sao.',nc3,10],
+   ['writeN10','ruby','Idol viết văn','Có 20 đề thi thử Nâng cao đạt 3 sao.',nc3,20],
+   ['writeN20','kc','KOL văn chương','Có 35 đề thi thử Nâng cao đạt 3 sao.',nc3,35]]
   .forEach(([id,tier,name,how,have,need])=>out.push({id,grp:'Viết văn',tier,name,how,have:Math.min(have,need),need,ok:have>=need}));
   const kings=out.filter(b=>/^isl\d-2$/.test(b.id)&&b.ok).length;
   out.push({id:'king',grp:'Tối thượng',tier:'vang',name:'Vua Đảo Câu Văn',how:'Có đủ 5 huy hiệu Chúa đảo.',have:kings,need:5,ok:kings>=5});

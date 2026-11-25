@@ -110,8 +110,8 @@ function earned(id, p) {
   switch (id) {
     case "streak10": return (x.maxStreak || 0) >= 10; case "streak20": return (x.maxStreak || 0) >= 20; case "streak30": return (x.maxStreak || 0) >= 30;
     case "perfect5": return (x.perfect || 0) >= 5; case "days7": return bestRun(x.days) >= 7; case "days30": return bestRun(x.days) >= 30;
-    case "write5": return deN(() => true) >= 5; case "write2s": return deN(e => (e.stars || 0) >= 2) >= 5; case "write3s": return deN(e => e.stars === 3) >= 5;
-    case "writeN5": return deN(e => e.nc && e.stars === 3) >= 5; case "writeN10": return deN(e => e.nc && e.stars === 3) >= 10; case "writeN20": return deN(e => e.nc && e.stars === 3) >= 20;
+    case "write5": return deN(() => true) >= 5; case "write2s": return deN(e => (e.stars || 0) >= 2) >= 10; case "write3s": return deN(e => e.stars === 3) >= 10;
+    case "writeN5": return deN(e => e.nc && e.stars === 3) >= 10; case "writeN10": return deN(e => e.nc && e.stars === 3) >= 20; case "writeN20": return deN(e => e.nc && e.stars === 3) >= 35;
     case "king": return [0, 1, 2, 3, 4].every(k => earned("isl" + k + "-2", p));
     case "legend": return [0, 1, 2, 3, 4].every(k => earned("nisl" + k + "-2", p));
   }
