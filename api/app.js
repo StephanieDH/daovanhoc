@@ -79,13 +79,16 @@ const xuOut = x => { x = x || {}; return { total: x.total || 0, peak: x.peak || 
   stats: { solved: x.solved || {}, maxStreak: x.maxStreak || 0, perfect: x.perfect || 0, bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
 // Thưởng xu khi mở khóa huy hiệu (mỗi huy hiệu một lần). Danh sách huy hiệu do trình duyệt tính; máy chủ giữ mức thưởng.
 const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 100, praised: 150, write3s: 200, king: 1000 };
+// hệ số xu theo đảo: 0 Mở rộng câu ×1; 1 Câu ghép, 2 Tu từ, 3 Từ ngữ ×½; 4 Viết đoạn (gồm thi thử) ×2
+const ISL_MUL = [1, 0.5, 0.5, 0.5, 2];
+const gameIsl = g => { g = String(g).replace(/-nc$/, ''); if (g === 'thi-thu') return 4; const k = ISL_GAMES.findIndex(a => a.includes(g)); return k < 0 ? 0 : k; };
 function badgeReward(id) {
   let m = /^([a-z-]+)-nc-(dong|bac|vang)$/.exec(id);
-  if (m && GAME_BASE.includes(m[1]) && m[1] !== "thi-thu") return { dong: 100, bac: 200, vang: 400 }[m[2]];
+  if (m && GAME_BASE.includes(m[1]) && m[1] !== "thi-thu") return { dong: 100, bac: 200, vang: 400 }[m[2]] * ISL_MUL[gameIsl(m[1])];
   m = /^([a-z-]+)-(dong|bac|vang)$/.exec(id);
-  if (m && GAME_IDS.includes(m[1]) && m[1] !== "thi-thu") return { dong: 50, bac: 100, vang: 200 }[m[2]];
-  m = /^isl([0-4])-([12])$/.exec(id); if (m) return m[2] === "1" ? 150 : 300;
-  m = /^nisl([0-4])-([12])$/.exec(id); if (m) return m[2] === "1" ? 300 : 600;
+  if (m && GAME_IDS.includes(m[1]) && m[1] !== "thi-thu") return { dong: 50, bac: 100, vang: 200 }[m[2]] * ISL_MUL[gameIsl(m[1])];
+  m = /^isl([0-4])-([12])$/.exec(id); if (m) return (m[2] === "1" ? 150 : 300) * ISL_MUL[+m[1]];
+  m = /^nisl([0-4])-([12])$/.exec(id); if (m) return (m[2] === "1" ? 300 : 600) * ISL_MUL[+m[1]];
   return BADGE_FIXED[id] || 0;
 }
 // Số câu (số dòng) của từng ngân hàng: phải khớp với data/*.js (cam-thu = 50 ở tu-tu.js + 20 ở dau-cau.js).
@@ -169,14 +172,14 @@ async function handle(req, res) {
     p.best = { ...(p.best || {}) }; if (!(p.best[game] >= stars)) p.best[game] = stars;
     // xu: phần cộng/trừ trong lượt chơi do trình duyệt gửi lên (giới hạn hợp lí), thưởng thêm do máy chủ tính
     const x = { ...(p.xu || {}) }, bonus = [];
-    let delta = Math.max(-500, Math.min(game.endsWith('-nc') ? 1800 : 900, parseInt(body.xu, 10) || 0));
+    let delta = Math.max(-500, Math.min(game.endsWith('-nc') ? 3600 : 1800, parseInt(body.xu, 10) || 0));
     // thi thử: mỗi đề được tối đa +20 (lần nộp đầu) + 10 mỗi sao vượt kỷ lục cũ của đề + 30 (lần đầu đạt 3 sao)
     if (isThi(game) && body.essay) {
       const de = String(body.essay.de || '').slice(0, 300), old = (p.essays || []).filter(e => e.de === de), prev = Math.max(0, ...old.map(e => e.stars || 0));
-      const cap = ((old.length ? 0 : 20) + 10 * Math.max(0, stars - prev) + (stars === 3 && prev < 3 ? 30 : 0)) * (game.endsWith('-nc') ? 2 : 1);
+      const cap = ((old.length ? 0 : 20) + 10 * Math.max(0, stars - prev) + (stars === 3 && prev < 3 ? 30 : 0)) * (game.endsWith('-nc') ? 2 : 1) * ISL_MUL[gameIsl(game)];
       delta = Math.min(delta, cap);
     }
-    if (stars === 3 && prevStars < 3) bonus.push(["Lần đầu đạt 3 sao ở trò này", game.endsWith('-nc') ? 100 : 50]);
+    if (stars === 3 && prevStars < 3) bonus.push(["Lần đầu đạt 3 sao ở trò này", Math.floor((game.endsWith('-nc') ? 100 : 50) * ISL_MUL[gameIsl(game)])]);
     const today = vnDay(); x.days = Array.isArray(x.days) ? x.days : [];
     if (!x.days.includes(today)) {
       bonus.push(["Chơi hôm nay", 15]); x.days = [...x.days, today].slice(-60);
