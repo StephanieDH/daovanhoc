@@ -795,7 +795,7 @@ function giftFeed(S){
   return (pend.length?pend.map(row).join(''):'<div class="board"><p>Không có yêu cầu đổi quà nào đang chờ.</p></div>')+(done.length?'<h2 class="sec">Đã xử lí gần đây</h2>'+done.map(row).join(''):'');
 }
 function giftEditor(st){
-  const g=(st.xu&&st.xu.gifts)||[],rows=[...g,...Array(Math.max(0,7-g.length)).fill({m:'',name:''})].slice(0,10);
+  const g=(st.xu&&st.xu.gifts)||[],rows=[...g,...Array(Math.max(0,8-g.length)).fill({m:'',name:''})].slice(0,10);
   return `<details class="gedit"><summary>Sửa danh sách quà của ${esc(st.name)}</summary><form data-form="gifts" data-code="${esc(st.code)}">
     <div class="grows">${rows.map((r,i)=>`<div class="grow"><input type="number" min="10" step="10" class="plain-in" name="m${i}" value="${r.m}" placeholder="Mốc xu" aria-label="Mốc xu ${i+1}"><input class="plain-in" name="n${i}" value="${esc(r.name||'')}" placeholder="Tên quà" aria-label="Tên quà ${i+1}" maxlength="80"></div>`).join('')}</div>
     <div class="actions"><button class="primary sm" type="submit">Lưu danh sách quà</button><span class="fine saved" role="status"></span></div>

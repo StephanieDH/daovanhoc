@@ -228,7 +228,7 @@ async function handle(req, res) {
     const me = need(await who(req), ["teacher", "admin", "parent"]);
     const code = String(body.code || "").toUpperCase(); if (!canKid(me, code)) bad("Tài khoản này không xem được học sinh này.", 403);
     const list = (Array.isArray(body.gifts) ? body.gifts : []).map(g => ({ m: parseInt(g.m, 10), name: String(g.name || "").trim().slice(0, 80) }))
-      .filter(g => g.name && g.m >= 10 && g.m <= 100000).sort((a, b) => a.m - b.m).slice(0, 10);
+      .filter(g => g.name && g.m >= 10 && g.m <= 1000000).sort((a, b) => a.m - b.m).slice(0, 10);
     if (new Set(list.map(g => g.m)).size !== list.length) bad("Mỗi mốc xu chỉ đặt một món quà.");
     const p = await prog(code), x = { ...(p.xu || {}) }; x.gifts = list.length ? list : undefined;
     p.xu = x; await progPut(p); return out({ xu: xuOut(x) });
