@@ -108,9 +108,10 @@ async function saveRound(id,s,essay){
 }
 async function logout(){try{await call('logout',{})}catch(e){}me=null;essays=[];DASH=null;best=LS.get('dcv-best-guest',{})||{};xu=LS.get('dcv-xu-guest',{total:0,peak:0})||{total:0,peak:0};renderTotal();if(location.hash)location.hash='';else renderMap()}
 function renderTotal(){
-  const t=GAMES.reduce((a,g)=>a+(best[g.id]||0),0);
+  // tổng sao gộp Cơ bản + Nâng cao (khớp với báo cáo)
+  const ids=[...GAMES.map(g=>g.id),...NCG().map(g=>g.id)],t=ids.reduce((a,id)=>a+(best[id]||0),0);
   document.getElementById('total').innerHTML=(me?`<span class="who">${esc(isStudent()?me.name+' · '+me.code:me.name)}</span>`:'')+
-    (isStaff()?`<a class="who-link" href="#theo-doi">${me.role==='parent'?'Báo cáo của con':'Bảng theo dõi'}</a>`:`<svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg>${t}/${GAMES.length*3}<a class="xu-link" href="#qua" title="Kệ quà">${COIN}<b>${Math.max(0,(xu.total||0)+((G&&G.xu)||0))}</b> xu</a>`);
+    (isStaff()?`<a class="who-link" href="#theo-doi">${me.role==='parent'?'Báo cáo của con':'Bảng theo dõi'}</a>`:`<svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg>${t}/${ids.length*3}<a class="xu-link" href="#qua" title="Kệ quà">${COIN}<b>${Math.max(0,(xu.total||0)+((G&&G.xu)||0))}</b> xu</a>`);
 }
 
 let G=null;
