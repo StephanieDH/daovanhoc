@@ -85,6 +85,7 @@ function badgeReward(id) {
   m = /^([a-z-]+)-(dong|bac|vang)$/.exec(id);
   if (m && GAME_IDS.includes(m[1]) && m[1] !== "thi-thu") return { dong: 50, bac: 100, vang: 200 }[m[2]];
   m = /^isl([0-4])-([12])$/.exec(id); if (m) return m[2] === "1" ? 150 : 300;
+  m = /^nisl([0-4])-([12])$/.exec(id); if (m) return m[2] === "1" ? 300 : 600;
   return BADGE_FIXED[id] || 0;
 }
 // Số câu (số dòng) của từng ngân hàng: phải khớp với data/*.js (cam-thu = 50 ở tu-tu.js + 20 ở dau-cau.js).
@@ -101,6 +102,7 @@ function earned(id, p) {
   const tierOk = (g, tier) => BANK_ROWS[g] > 0 && (sv[g] || []).length >= Math.ceil(BANK_ROWS[g] * { dong: 0.4, bac: 0.7, vang: 1 }[tier]);
   let m = /^([a-z-]+)-(dong|bac|vang)$/.exec(id); if (m) return tierOk(m[1], m[2]);
   m = /^isl([0-4])-([12])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g, m[2] === "1" ? "dong" : "vang"));
+  m = /^nisl([0-4])-([12])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g + "-nc", m[2] === "1" ? "dong" : "vang"));
   switch (id) {
     case "streak10": return (x.maxStreak || 0) >= 10; case "streak20": return (x.maxStreak || 0) >= 20; case "streak30": return (x.maxStreak || 0) >= 30;
     case "perfect5": return (x.perfect || 0) >= 5; case "days7": return bestRun(x.days) >= 7; case "days30": return bestRun(x.days) >= 30;
@@ -167,14 +169,14 @@ async function handle(req, res) {
     p.best = { ...(p.best || {}) }; if (!(p.best[game] >= stars)) p.best[game] = stars;
     // xu: phần cộng/trừ trong lượt chơi do trình duyệt gửi lên (giới hạn hợp lí), thưởng thêm do máy chủ tính
     const x = { ...(p.xu || {}) }, bonus = [];
-    let delta = Math.max(-500, Math.min(900, parseInt(body.xu, 10) || 0));
+    let delta = Math.max(-500, Math.min(game.endsWith('-nc') ? 1800 : 900, parseInt(body.xu, 10) || 0));
     // thi thử: mỗi đề được tối đa +20 (lần nộp đầu) + 10 mỗi sao vượt kỷ lục cũ của đề + 30 (lần đầu đạt 3 sao)
     if (isThi(game) && body.essay) {
       const de = String(body.essay.de || '').slice(0, 300), old = (p.essays || []).filter(e => e.de === de), prev = Math.max(0, ...old.map(e => e.stars || 0));
-      const cap = (old.length ? 0 : 20) + 10 * Math.max(0, stars - prev) + (stars === 3 && prev < 3 ? 30 : 0);
+      const cap = ((old.length ? 0 : 20) + 10 * Math.max(0, stars - prev) + (stars === 3 && prev < 3 ? 30 : 0)) * (game.endsWith('-nc') ? 2 : 1);
       delta = Math.min(delta, cap);
     }
-    if (stars === 3 && prevStars < 3) bonus.push(["Lần đầu đạt 3 sao ở trò này", 50]);
+    if (stars === 3 && prevStars < 3) bonus.push(["Lần đầu đạt 3 sao ở trò này", game.endsWith('-nc') ? 100 : 50]);
     const today = vnDay(); x.days = Array.isArray(x.days) ? x.days : [];
     if (!x.days.includes(today)) {
       bonus.push(["Chơi hôm nay", 15]); x.days = [...x.days, today].slice(-60);

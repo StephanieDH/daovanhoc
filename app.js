@@ -129,7 +129,7 @@ function goalsHtml(L){
 }
 function rulesHtml(cls){
   const R=[['up','+10','Đúng ngay lần đầu'],['up','+5','Đúng ở lần thử 2'],['dn','−2','Mỗi lần sai'],['gr','0','Câu đã làm đúng rồi'],['fl','+50','Đúng liền 5 câu'],['fl','+100','Đúng liền 10 câu'],['up','+10','Mỗi sao mới của trò'],['up','+15','Chơi mỗi ngày']];
-  return `<div class="rules${cls?' '+cls:''}"><p class="rt">${COIN}Cách kiếm xu đổi quà</p><div class="rg">${R.map(([c,n,l])=>`<div class="rr ${c}"><b>${n}</b><span>${l}</span></div>`).join('')}</div><p class="rgi">Đủ xu thì đổi quà ngay hoặc để dành. Đổi quà sẽ trừ xu.</p></div>`;
+  return `<div class="rules${cls?' '+cls:''}"><p class="rt">${COIN}Cách kiếm xu đổi quà</p><div class="rg">${R.map(([c,n,l])=>`<div class="rr ${c}"><b>${n}</b><span>${l}</span></div>`).join('')}</div><p class="rgi">Mức Nâng cao: xu thưởng gấp đôi. Đủ xu thì đổi quà ngay hoặc để dành. Đổi quà sẽ trừ xu.</p></div>`;
 }
 function acct(){
   if(isStudent()){const L=badgeList(xu,essays);
@@ -185,7 +185,7 @@ function toast(n,label,cls){
   while(box.children.length>=2)box.firstChild.remove();
   const el=document.createElement('div');el.className='toast '+(cls||(n>0?'up':n<0?'down':'zero'));el.textContent=cls==='badge'?label+' · +'+n+' xu':(n>0?'+'+n+' xu · ':n<0?n+' xu · ':'')+label;box.appendChild(el);setTimeout(()=>el.remove(),2300);
 }
-function xuAdd(n,label,quiet){if(!G||isStaff())return;G.xu+=n;G.xuLines.push([label,n]);if(!quiet)toast(n,label);renderTotal()}
+function xuAdd(n,label,quiet){if(!G||isStaff())return;if(G.g&&G.g.nc&&n>0)n*=2;  /* mức Nâng cao: xu thưởng gấp đôi */G.xu+=n;G.xuLines.push([label,n]);if(!quiet)toast(n,label);renderTotal()}
 function xuJudge(prev){
   if(!G||isStaff()||G.ended)return;const m=G.msg;if(!m||m===prev)return;
   // đơn vị tính xu: mỗi câu hỏi; trò nhiều bước (một câu có nhiều bước) chỉ tính xu một lần, ở bước đúng đầu tiên
@@ -828,6 +828,9 @@ function badgeList(x,ess){
   ISLANDS.forEach((isl,k)=>{const gs=GAMEB().filter(g=>g.is===k),has=tier=>gs.filter(g=>out.find(b=>b.id===g.id+'-'+tier).ok).length;
     out.push({id:'isl'+k+'-1',grp:'Đảo',tier:'bac',isl:k,name:'Nhà thám hiểm '+isl.name,how:`Có huy hiệu Đồng ở cả ${gs.length} trò của ${isl.name}.`,have:has('dong'),need:gs.length,ok:has('dong')===gs.length});
     out.push({id:'isl'+k+'-2',grp:'Đảo',tier:'vang',isl:k,name:'Chúa đảo '+isl.name.replace('Đảo ',''),how:`Có huy hiệu Vàng ở cả ${gs.length} trò của ${isl.name}.`,have:has('vang'),need:gs.length,ok:has('vang')===gs.length})});
+  ISLANDS.forEach((isl,k)=>{const gs=NCG().filter(g=>g.base!=='thi-thu'&&g.is===k);if(!gs.length)return;const has=tier=>gs.filter(g=>(out.find(b=>b.id===g.id+'-'+tier)||{}).ok).length;
+    out.push({id:'nisl'+k+'-1',grp:'Đảo Nâng cao',tier:'bac',isl:k,name:'Chiến thần '+isl.name,how:`Có huy hiệu Đồng Nâng cao ở cả ${gs.length} trò của ${isl.name}.`,have:has('dong'),need:gs.length,ok:has('dong')===gs.length});
+    out.push({id:'nisl'+k+'-2',grp:'Đảo Nâng cao',tier:'vang',isl:k,name:'Trùm cuối '+isl.name,how:`Có huy hiệu Vàng Nâng cao ở cả ${gs.length} trò của ${isl.name}.`,have:has('vang'),need:gs.length,ok:has('vang')===gs.length})});
   const ms=st.maxStreak||0;[[10,'Ngọn lửa nhỏ'],[20,'Ngọn lửa lớn'],[30,'Ngọn lửa bất diệt']].forEach(([n,name],i)=>out.push({id:'streak'+n,grp:'Chuỗi đúng',tier:TIERS[i][0],name,how:`Đúng liên tiếp ${n} câu trong một lượt chơi.`,have:Math.min(ms,n),need:n,ok:ms>=n}));
   out.push({id:'perfect5',grp:'Hoàn hảo',tier:'vang',name:'Không một lỗi',how:'Có 5 lượt chơi đúng hết ngay lần đầu.',have:Math.min(st.perfect||0,5),need:5,ok:(st.perfect||0)>=5});
   const bd=st.bestDays||0;[[7,'Chăm học 7 ngày','bac'],[30,'Chăm học 30 ngày','vang']].forEach(([n,name,tier])=>out.push({id:'days'+n,grp:'Chăm chỉ',tier,name,how:`Chơi liên tục ${n} ngày.`,have:Math.min(bd,n),need:n,ok:bd>=n}));
@@ -839,7 +842,7 @@ function badgeList(x,ess){
   out.push({id:'king',grp:'Tối thượng',tier:'vang',name:'Vua Đảo Câu Văn',how:'Có đủ 5 huy hiệu Chúa đảo.',have:kings,need:5,ok:kings>=5});
   return out;
 }
-function BREWARD(id){let m=/-nc-(dong|bac|vang)$/.exec(id);if(m)return {dong:100,bac:200,vang:400}[m[1]];m=/^([a-z-]+)-(dong|bac|vang)$/.exec(id);if(m)return {dong:50,bac:100,vang:200}[m[2]];m=/^isl(\d)-([12])$/.exec(id);if(m)return m[2]==='1'?150:300;return {streak10:100,streak20:200,streak30:300,perfect5:200,days7:150,days30:300,write5:100,praised:150,write3s:200,king:1000}[id]||0}
+function BREWARD(id){let m=/-nc-(dong|bac|vang)$/.exec(id);if(m)return {dong:100,bac:200,vang:400}[m[1]];m=/^nisl(\d)-([12])$/.exec(id);if(m)return m[2]==='1'?300:600;m=/^([a-z-]+)-(dong|bac|vang)$/.exec(id);if(m)return {dong:50,bac:100,vang:200}[m[2]];m=/^isl(\d)-([12])$/.exec(id);if(m)return m[2]==='1'?150:300;return {streak10:100,streak20:200,streak30:300,perfect5:200,days7:150,days30:300,write5:100,praised:150,write3s:200,king:1000}[id]||0}
 function badgeHtml(b,paid){const n=BREWARD(b.id);return `<div class="bdg ${b.ok?'on':'off'} t-${b.tier}"><span class="medal">${b.ok?MEDAL:LOCK}</span><b>${esc(b.name)}</b><span class="fine">${esc(b.how)}</span>${b.ok?'<span class="fine got">Đã mở khóa</span>':`<div class="meter sm"><div style="width:${Math.round(b.have/b.need*100)}%"></div></div><span class="fine">${b.have}/${b.need}</span>`}<span class="rw">${b.ok?((paid||[]).includes(b.id)?`Đã nhận ${vn(n)} xu`:`Sẽ nhận ${vn(n)} xu sau lượt chơi tới`):`Thưởng ${vn(n)} xu`}</span></div>`}
 function gameBadgeCard(g,sv){const n=bank(g.id).length,got=(sv[g.id]||[]).length;
   return `<div class="gbdg c${g.is}"><b>${g.name}</b><div class="meter sm"><div style="width:${Math.round(got/n*100)}%"></div></div><span class="fine">${got}/${n} câu đã chinh phục</span><span class="pips">${TIERS.map(([k,name,p])=>`<span class="pip t-${k}${got>=Math.ceil(n*p)?' on':''}" title="${name}: ${Math.ceil(n*p)} câu">${name}</span>`).join('')}</span></div>`}
