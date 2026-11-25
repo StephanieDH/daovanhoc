@@ -129,7 +129,7 @@ function goalsHtml(L){
 }
 function rulesHtml(cls){
   const R=[['up','+10','Đúng ngay lần đầu'],['up','+5','Đúng ở lần thử 2'],['dn','−2','Mỗi lần sai'],['gr','0','Câu đã làm đúng rồi'],['fl','+50','Đúng liền 5 câu'],['fl','+100','Đúng liền 10 câu'],['up','+10','Mỗi sao mới của trò'],['up','+15','Chơi mỗi ngày']];
-  return `<div class="rules${cls?' '+cls:''}"><p class="rt">${COIN}Cách kiếm xu đổi quà</p><div class="rg">${R.map(([c,n,l])=>`<div class="rr ${c}"><b>${n}</b><span>${l}</span></div>`).join('')}</div><p class="rgi">Mức Nâng cao: xu thưởng gấp đôi. Đủ xu thì đổi quà ngay hoặc để dành. Đổi quà sẽ trừ xu.</p></div>`;
+  return `<div class="rules${cls?' '+cls:''}"><p class="rt">${COIN}Cách kiếm xu đổi quà</p><div class="rg">${R.map(([c,n,l])=>`<div class="rr ${c}"><b>${n}</b><span>${l}</span></div>`).join('')}</div><p class="rgi">Mức Nâng cao: xu thưởng gấp đôi, sai trừ 4 xu. Đủ xu thì đổi quà ngay hoặc để dành. Đổi quà sẽ trừ xu.</p></div>`;
 }
 function acct(){
   if(isStudent()){const L=badgeList(xu,essays);
@@ -185,7 +185,7 @@ function toast(n,label,cls){
   while(box.children.length>=2)box.firstChild.remove();
   const el=document.createElement('div');el.className='toast '+(cls||(n>0?'up':n<0?'down':'zero'));el.textContent=cls==='badge'?label+' · +'+n+' xu':(n>0?'+'+n+' xu · ':n<0?n+' xu · ':'')+label;box.appendChild(el);setTimeout(()=>el.remove(),2300);
 }
-function xuAdd(n,label,quiet){if(!G||isStaff())return;if(G.g&&G.g.nc&&n>0)n*=2;  /* mức Nâng cao: xu thưởng gấp đôi */G.xu+=n;G.xuLines.push([label,n]);if(!quiet)toast(n,label);renderTotal()}
+function xuAdd(n,label,quiet){if(!G||isStaff())return;if(G.g&&G.g.nc)n*=2;  /* mức Nâng cao: xu thưởng và xu trừ đều gấp đôi */G.xu+=n;G.xuLines.push([label,n]);if(!quiet)toast(n,label);renderTotal()}
 function xuJudge(prev){
   if(!G||isStaff()||G.ended)return;const m=G.msg;if(!m||m===prev)return;
   // đơn vị tính xu: mỗi câu hỏi; trò nhiều bước (một câu có nhiều bước) chỉ tính xu một lần, ở bước đúng đầu tiên
