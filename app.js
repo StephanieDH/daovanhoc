@@ -128,9 +128,9 @@ function goalsHtml(L){
   // chuỗi chăm học: số ngày chơi liên tiếp, mốc thưởng mỗi 7 ngày
   const sk=xu.streak||0,left=7-(sk%7);
   const streakRow=`<div class="gl"><span>Chuỗi chăm học: <b>🔥 ${sk} ngày liên tiếp</b> · ${sk&&sk%7===0?'vừa nhận +100 xu, giữ chuỗi nhé!':`còn ${left} ngày tới +100 xu`}</span><div class="gbar"><i class="flame" style="width:${Math.round((sk%7||(sk?7:0))/7*100)}%"></i></div></div>`;
-  // mục tiêu hôm nay (máy chủ chọn và giữ cố định trong ngày)
-  const gl=xu.goal,gg=gl&&([...GAMES,...NCG()].find(x=>x.id===gl.game));
-  const goalRow=gg?`<div class="gl"><span>Mục tiêu hôm nay</span><div class="goalbox"><span>Chơi 1 lượt <b>${esc(gg.name)}${gg.nc?' · Nâng cao':''}</b></span>${gl.done?'<span class="gdone">✓ Hoàn thành · +50 xu</span>':`<a class="primary sm" href="#${gg.id}">Chơi ngay →</a>`}</div><span class="fine">${gl.done?'Ngày mai sẽ có mục tiêu mới.':'Xong một lượt được thưởng +50 xu.'}</span></div>`:'';
+  // gợi ý kiếm thêm xu (máy chủ chọn trò bé ít chơi; xong một lượt có câu mới +50 xu, tối đa 3 lần/ngày)
+  const gl=xu.goal,gg=gl&&([...GAMES,...NCG()].find(x=>x.id===gl.game)),gleft=xu.goalLeft??3;
+  const goalRow=gg?`<div class="gl"><span>Gợi ý kiếm thêm xu</span><div class="goalbox"><span>Chơi 1 lượt <b>${esc(gg.name)}${gg.nc?' · Nâng cao':''}</b></span><a class="primary sm" href="#${gg.id}">Chơi ngay →</a></div><span class="fine">${gleft>0?`Xong một lượt có câu mới: +50 xu · hôm nay còn ${gleft} lần`:'Hôm nay đã nhận đủ 3 lần thưởng, mai thưởng tiếp nhé.'}</span></div>`:'';
   return `<div class="goals">${giftRow}${badgeRow}${streakRow}${goalRow}</div>`;
 }
 function rulesHtml(cls){
