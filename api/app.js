@@ -84,11 +84,11 @@ const ISL_MUL = [1, 0.5, 0.5, 0.5, 2];
 const gameIsl = g => { g = String(g).replace(/-nc$/, ''); if (g === 'thi-thu') return 4; const k = ISL_GAMES.findIndex(a => a.includes(g)); return k < 0 ? 0 : k; };
 function badgeReward(id) {
   let m = /^([a-z-]+)-nc-(dong|bac|vang)$/.exec(id);
-  if (m && GAME_BASE.includes(m[1]) && m[1] !== "thi-thu") return { dong: 100, bac: 200, vang: 400 }[m[2]] * ISL_MUL[gameIsl(m[1])];
+  if (m && GAME_BASE.includes(m[1]) && m[1] !== "thi-thu") return { dong: 250, bac: 300, vang: 400 }[m[2]] * ISL_MUL[gameIsl(m[1])];
   m = /^([a-z-]+)-(dong|bac|vang)$/.exec(id);
   if (m && GAME_IDS.includes(m[1]) && m[1] !== "thi-thu") return { dong: 50, bac: 100, vang: 200 }[m[2]] * ISL_MUL[gameIsl(m[1])];
   m = /^isl([0-4])-([12])$/.exec(id); if (m) return (m[2] === "1" ? 150 : 300) * ISL_MUL[+m[1]];
-  m = /^nisl([0-4])-([12])$/.exec(id); if (m) return (m[2] === "1" ? 300 : 600) * ISL_MUL[+m[1]];
+  m = /^nisl([0-4])-([123])$/.exec(id); if (m) return ({ 1: 400, 3: 500, 2: 600 })[m[2]] * ISL_MUL[+m[1]];
   return BADGE_FIXED[id] || 0;
 }
 // Số câu (số dòng) của từng ngân hàng: phải khớp với data/*.js (cam-thu = 50 ở tu-tu.js + 20 ở dau-cau.js).
@@ -105,7 +105,7 @@ function earned(id, p) {
   const tierOk = (g, tier) => BANK_ROWS[g] > 0 && (sv[g] || []).length >= Math.ceil(BANK_ROWS[g] * { dong: 0.4, bac: 0.7, vang: 1 }[tier]);
   let m = /^([a-z-]+)-(dong|bac|vang)$/.exec(id); if (m) return tierOk(m[1], m[2]);
   m = /^isl([0-4])-([12])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g, m[2] === "1" ? "dong" : "vang"));
-  m = /^nisl([0-4])-([12])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g + "-nc", m[2] === "1" ? "dong" : "vang"));
+  m = /^nisl([0-4])-([123])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g + "-nc", ({ 1: "dong", 3: "bac", 2: "vang" })[m[2]]));
   switch (id) {
     case "streak10": return (x.maxStreak || 0) >= 10; case "streak20": return (x.maxStreak || 0) >= 20; case "streak30": return (x.maxStreak || 0) >= 30;
     case "perfect5": return (x.perfect || 0) >= 5; case "days7": return bestRun(x.days) >= 7; case "days30": return bestRun(x.days) >= 30;

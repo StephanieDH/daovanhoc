@@ -821,19 +821,20 @@ async function saveGifts(f){
 const MEDAL='<svg class="medal-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h8l-2.5 6h-3z"/><circle cx="12" cy="15" r="6"/></svg>';
 const LOCK='<svg class="medal-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
 const TIERS=[['dong','Đồng',.4],['bac','Bạc',.7],['vang','Vàng',1]];
+// chuỗi bậc Nâng cao tiếp nối Đồng–Bạc–Vàng: id vẫn là <trò>-nc-dong/bac/vang
+const NTIERS=[['dong','Titan',.4,'titan'],['bac','Ruby',.7,'ruby'],['vang','Kim cương',1,'kc']];
 const GAMEB=()=>GAMES.filter(g=>g.id!=='thi-thu');
 function badgeList(x,ess){
   const st=(x&&x.stats)||{},sv=st.solved||{},E=ess||[],out=[];
   for(const g of GAMEB()){const n=bank(g.id).length,got=(sv[g.id]||[]).length;
     TIERS.forEach(([k,name,p])=>{const need=Math.ceil(n*p);out.push({id:g.id+'-'+k,grp:'Bộ câu hỏi',tier:k,isl:g.is,name:name+' · '+g.name,how:`Trả lời đúng ngay lần đầu ${need}/${n} câu khác nhau của trò ${g.name}.`,have:Math.min(got,need),need,ok:got>=need})})}
   for(const g of NCG().filter(g=>g.base!=='thi-thu')){const n=bank(g.id).length,got=(sv[g.id]||[]).length;
-    TIERS.forEach(([k,name,p])=>{const need=Math.ceil(n*p);out.push({id:g.id+'-'+k,grp:'Bộ câu hỏi Nâng cao',tier:k,isl:g.is,name:name+' Nâng cao · '+g.name,how:`Trả lời đúng ngay lần đầu ${need}/${n} câu Nâng cao của trò ${g.name}.`,have:Math.min(got,need),need,ok:got>=need})})}
-  ISLANDS.forEach((isl,k)=>{const gs=GAMEB().filter(g=>g.is===k),has=tier=>gs.filter(g=>out.find(b=>b.id===g.id+'-'+tier).ok).length;
-    out.push({id:'isl'+k+'-1',grp:'Đảo',tier:'bac',isl:k,name:'Nhà thám hiểm '+isl.name,how:`Có huy hiệu Đồng ở cả ${gs.length} trò của ${isl.name}.`,have:has('dong'),need:gs.length,ok:has('dong')===gs.length});
-    out.push({id:'isl'+k+'-2',grp:'Đảo',tier:'vang',isl:k,name:'Chúa đảo '+isl.name.replace('Đảo ',''),how:`Có huy hiệu Vàng ở cả ${gs.length} trò của ${isl.name}.`,have:has('vang'),need:gs.length,ok:has('vang')===gs.length})});
-  ISLANDS.forEach((isl,k)=>{const gs=NCG().filter(g=>g.base!=='thi-thu'&&g.is===k);if(!gs.length)return;const has=tier=>gs.filter(g=>(out.find(b=>b.id===g.id+'-'+tier)||{}).ok).length;
-    out.push({id:'nisl'+k+'-1',grp:'Đảo Nâng cao',tier:'bac',isl:k,name:'Chiến thần '+isl.name,how:`Có huy hiệu Đồng Nâng cao ở cả ${gs.length} trò của ${isl.name}.`,have:has('dong'),need:gs.length,ok:has('dong')===gs.length});
-    out.push({id:'nisl'+k+'-2',grp:'Đảo Nâng cao',tier:'vang',isl:k,name:'Trùm cuối '+isl.name,how:`Có huy hiệu Vàng Nâng cao ở cả ${gs.length} trò của ${isl.name}.`,have:has('vang'),need:gs.length,ok:has('vang')===gs.length})});
+    NTIERS.forEach(([k,name,p,t])=>{const need=Math.ceil(n*p);out.push({id:g.id+'-'+k,grp:'Bộ câu hỏi',tier:t,isl:g.is,name:name+' · '+g.name,how:`Trả lời đúng ngay lần đầu ${need}/${n} câu Nâng cao của trò ${g.name}.`,have:Math.min(got,need),need,ok:got>=need})})}
+  // chuỗi huy hiệu đảo: Nhà thám hiểm (Đồng) → Chúa đảo (Vàng) → Chiến thần (Titan) → Out trình (Ruby) → Trùm cuối (Kim cương)
+  ISLANDS.forEach((isl,k)=>{const gs=GAMEB().filter(g=>g.is===k),has=id=>gs.filter(g=>(out.find(b=>b.id===g.id+id)||{}).ok).length,short=isl.name.replace('Đảo ','');
+    [['isl'+k+'-1','dong','Nhà thám hiểm '+isl.name,'-dong','Đồng'],['isl'+k+'-2','vang','Chúa đảo '+short,'-vang','Vàng'],
+     ['nisl'+k+'-1','titan','Chiến thần '+isl.name,'-nc-dong','Titan'],['nisl'+k+'-3','ruby','Out trình '+isl.name,'-nc-bac','Ruby'],['nisl'+k+'-2','kc','Trùm cuối '+isl.name,'-nc-vang','Kim cương']]
+    .forEach(([id,tier,name,suf,tn])=>{if(suf.startsWith('-nc')&&!bank(gs[0].id+'-nc').length)return;const hv=has(suf);out.push({id,grp:'Đảo',tier,isl:k,name,how:`Có huy hiệu ${tn} ở cả ${gs.length} trò của ${isl.name}.`,have:hv,need:gs.length,ok:hv===gs.length})})});
   const ms=st.maxStreak||0;[[10,'Ngọn lửa nhỏ'],[20,'Ngọn lửa lớn'],[30,'Ngọn lửa bất diệt']].forEach(([n,name],i)=>out.push({id:'streak'+n,grp:'Chuỗi đúng',tier:TIERS[i][0],name,how:`Đúng liên tiếp ${n} câu trong một lượt chơi.`,have:Math.min(ms,n),need:n,ok:ms>=n}));
   out.push({id:'perfect5',grp:'Hoàn hảo',tier:'vang',name:'Không một lỗi',how:'Có 5 lượt chơi đúng hết ngay lần đầu.',have:Math.min(st.perfect||0,5),need:5,ok:(st.perfect||0)>=5});
   const bd=st.bestDays||0;[[7,'Chăm học 7 ngày','bac'],[30,'Chăm học 30 ngày','vang']].forEach(([n,name,tier])=>out.push({id:'days'+n,grp:'Chăm chỉ',tier,name,how:`Chơi liên tục ${n} ngày.`,have:Math.min(bd,n),need:n,ok:bd>=n}));
@@ -845,16 +846,16 @@ function badgeList(x,ess){
   out.push({id:'king',grp:'Tối thượng',tier:'vang',name:'Vua Đảo Câu Văn',how:'Có đủ 5 huy hiệu Chúa đảo.',have:kings,need:5,ok:kings>=5});
   return out;
 }
-function BREWARD(id){let m=/^([a-z-]+)-nc-(dong|bac|vang)$/.exec(id);if(m)return {dong:100,bac:200,vang:400}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^nisl(\d)-([12])$/.exec(id);if(m)return (m[2]==='1'?300:600)*ISL_MUL[+m[1]];m=/^([a-z-]+)-(dong|bac|vang)$/.exec(id);if(m)return {dong:50,bac:100,vang:200}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^isl(\d)-([12])$/.exec(id);if(m)return (m[2]==='1'?150:300)*ISL_MUL[+m[1]];return {streak10:100,streak20:200,streak30:300,perfect5:200,days7:150,days30:300,write5:100,praised:150,write3s:200,king:1000}[id]||0}
+function BREWARD(id){let m=/^([a-z-]+)-nc-(dong|bac|vang)$/.exec(id);if(m)return {dong:250,bac:300,vang:400}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^nisl(\d)-([123])$/.exec(id);if(m)return {1:400,3:500,2:600}[m[2]]*ISL_MUL[+m[1]];m=/^([a-z-]+)-(dong|bac|vang)$/.exec(id);if(m)return {dong:50,bac:100,vang:200}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^isl(\d)-([12])$/.exec(id);if(m)return (m[2]==='1'?150:300)*ISL_MUL[+m[1]];return {streak10:100,streak20:200,streak30:300,perfect5:200,days7:150,days30:300,write5:100,praised:150,write3s:200,king:1000}[id]||0}
 function badgeHtml(b,paid){const n=BREWARD(b.id);return `<div class="bdg ${b.ok?'on':'off'} t-${b.tier}"><span class="medal">${b.ok?MEDAL:LOCK}</span><b>${esc(b.name)}</b><span class="fine">${esc(b.how)}</span>${b.ok?'<span class="fine got">Đã mở khóa</span>':`<div class="meter sm"><div style="width:${Math.round(b.have/b.need*100)}%"></div></div><span class="fine">${b.have}/${b.need}</span>`}<span class="rw">${b.ok?((paid||[]).includes(b.id)?`Đã nhận ${vn(n)} xu`:`Sẽ nhận ${vn(n)} xu sau lượt chơi tới`):`Thưởng ${vn(n)} xu`}</span></div>`}
-function gameBadgeCard(g,sv){const n=bank(g.id).length,got=(sv[g.id]||[]).length;
-  return `<div class="gbdg c${g.is}"><b>${g.name}</b><div class="meter sm"><div style="width:${Math.round(got/n*100)}%"></div></div><span class="fine">${got}/${n} câu đã chinh phục</span><span class="pips">${TIERS.map(([k,name,p])=>`<span class="pip t-${k}${got>=Math.ceil(n*p)?' on':''}" title="${name}: ${Math.ceil(n*p)} câu">${name}</span>`).join('')}</span></div>`}
+function gameBadgeCard(g,sv){const n=bank(g.id).length,got=Math.min((sv[g.id]||[]).length,n),nid=g.id+'-nc',nn=bank(nid).length,ng=Math.min((sv[nid]||[]).length,nn);
+  const bar=(lbl,a,t)=>`<div class="lvbar"><span>${lbl}</span><div class="meter sm"><div style="width:${t?Math.round(a/t*100):0}%"></div></div><span class="fine">${a}/${t}</span></div>`;
+  return `<div class="gbdg c${g.is}"><b>${g.name}</b>${bar('Cơ bản',got,n)}${nn?bar('Nâng cao',ng,nn):''}<span class="pips">${TIERS.map(([k,name,p])=>`<span class="pip t-${k}${got>=Math.ceil(n*p)?' on':''}" title="${name}: ${Math.ceil(n*p)} câu Cơ bản">${name}</span>`).join('')}${nn?NTIERS.map(([k,name,p,t])=>`<span class="pip t-${t}${ng>=Math.ceil(nn*p)?' on':''}" title="${name}: ${Math.ceil(nn*p)} câu Nâng cao">${name}</span>`).join(''):''}</span></div>`}
 function badgePanel(x,ess){
   const L=badgeList(x,ess),sv=((x&&x.stats)||{}).solved||{};
   return `<p class="bsum">${MEDAL}<b>${L.filter(b=>b.ok).length}</b>/${L.length} huy hiệu</p>
-    <h3 class="bgrp">Bộ câu hỏi</h3><p class="fine">Mỗi câu chỉ tính một lần, khi trả lời đúng ngay lần đầu (trò nhiều bước: đúng hết các bước). Đồng: 40% số câu của trò, Bạc: 70%, Vàng: tất cả. Thưởng: Đồng 50 xu, Bạc 100 xu, Vàng 200 xu.</p>
+    <h3 class="bgrp">Bộ câu hỏi</h3><p class="fine">Mỗi câu chỉ tính một lần, khi trả lời đúng ngay lần đầu (trò nhiều bước: đúng hết các bước). Đồng / Bạc / Vàng: 40% / 70% / 100% câu Cơ bản của trò; Titan / Ruby / Kim cương: 40% / 70% / 100% câu Nâng cao. Thưởng: 50 · 100 · 200 · 250 · 300 · 400 xu, nhân hệ số của đảo (Viết đoạn ×2, Mở rộng câu ×1, Câu ghép, Tu từ, Từ ngữ ×½).</p>
     <div class="gbdgs">${GAMEB().map(g=>gameBadgeCard(g,sv)).join('')}</div>
-    ${NCG().some(g=>g.base!=='thi-thu')?`<h3 class="bgrp">Bộ câu hỏi Nâng cao</h3><p class="fine">Tính riêng câu Nâng cao của mỗi trò. Đồng: 40%, Bạc: 70%, Vàng: tất cả. Thưởng gấp đôi: Đồng 100 xu, Bạc 200 xu, Vàng 400 xu.</p><div class="gbdgs">${NCG().filter(g=>g.base!=='thi-thu').map(g=>gameBadgeCard(g,sv)).join('')}</div>`:''}
     ${[...new Set(L.filter(b=>!b.grp.startsWith('Bộ câu hỏi')).map(b=>b.grp))].map(gp=>`<h3 class="bgrp">${gp}</h3><div class="bdgs">${L.filter(b=>b.grp===gp).map(b=>badgeHtml(b,(x&&x.paid)||[])).join('')}</div>`).join('')}`;
 }
 function renderBadges(){
