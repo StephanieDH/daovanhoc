@@ -94,7 +94,7 @@ function ensureGoal(p) {   // trả về true nếu vừa đặt gợi ý mới
 }
 const goalLeft = x => 3 - (x.gdone && x.gdone.day === vnDay() ? x.gdone.n : 0);
 const xuOut = x => { x = x || {}; return { total: x.total || 0, goal: x.goal || null, goalLeft: goalLeft(x), peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()),
-  stats: { solved: x.solved || {}, maxStreak: x.maxStreak || 0, perfect: x.perfect || 0, bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
+  stats: { solved: x.solved || {}, tried: x.tried || {}, maxStreak: x.maxStreak || 0, perfect: x.perfect || 0, bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
 // Thưởng xu khi mở khóa huy hiệu (mỗi huy hiệu một lần). Danh sách huy hiệu do trình duyệt tính; máy chủ giữ mức thưởng.
 const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 200, write2s: 300, write3s: 400, writeN5: 600, writeN10: 800, writeN20: 1200, king: 1000, legend: 3000 };
 // hệ số xu theo đảo: 0 Mở rộng câu ×1; 1 Câu ghép, 2 Tu từ, 3 Từ ngữ ×½; 4 Viết đoạn (gồm thi thử) ×2
@@ -221,6 +221,9 @@ async function handle(req, res) {
     // thống kê cho huy hiệu: các câu (số thứ tự trong ngân hàng) đã trả lời đúng ngay lần đầu, chuỗi dài nhất, số lượt hoàn hảo
     const sv = (Array.isArray(body.solved) ? body.solved : []).map(n => parseInt(n, 10)).filter(n => n >= 0 && n < (BANK_ROWS[game] || 0)).slice(0, 50);
     if (sv.length && !isThi(game)) { x.solved = { ...(x.solved || {}) }; x.solved[game] = [...new Set([...(x.solved[game] || []), ...sv])].sort((a, b) => a - b); }
+    // câu đã từng trả lời sai (để lượt sau ưu tiên ôn lại)
+    const tr = (Array.isArray(body.tried) ? body.tried : []).map(n => parseInt(n, 10)).filter(n => n >= 0 && n < (BANK_ROWS[game] || 0)).slice(0, 50);
+    if (tr.length && !isThi(game)) { x.tried = { ...(x.tried || {}) }; x.tried[game] = [...new Set([...(x.tried[game] || []), ...tr])].slice(-1000); }
     x.maxStreak = Math.max(x.maxStreak || 0, Math.min(200, parseInt(body.maxStreak, 10) || 0));
     if (body.perfect === true && !isThi(game)) x.perfect = (x.perfect || 0) + 1;
     p.xu = x; p.bonus = bonus;

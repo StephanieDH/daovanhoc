@@ -46,7 +46,9 @@ const pick=(a,n)=>shuffle(a).slice(0,n);
 // câu (số thứ tự trong ngân hàng) em đã trả lời đúng ngay lần đầu ở trò đang chơi
 const solvedSet=()=>new Set(G&&G.g&&isStudent()?((((xu&&xu.stats)||{}).solved||{})[G.g.id]||[]):[]);
 // bốc n câu, ưu tiên câu chưa làm đúng; hết câu mới mới lấy lại câu cũ
-function pickNew(a,n,kf){const S=solvedSet(),sh=shuffle(a);return [...sh.filter(x=>!S.has(kf(x))),...sh.filter(x=>S.has(kf(x)))].slice(0,n)}
+const triedSet=()=>new Set(G&&G.g&&isStudent()?((((xu&&xu.stats)||{}).tried||{})[G.g.id]||[]):[]);
+// bốc n câu: câu chưa gặp → câu đã từng sai → câu đã đúng; rồi trộn đều thứ tự trong lượt
+function pickNew(a,n,kf){const S=solvedSet(),T=triedSet(),sh=shuffle(a);return shuffle([...sh.filter(x=>!S.has(kf(x))&&!T.has(kf(x))),...sh.filter(x=>!S.has(kf(x))&&T.has(kf(x))),...sh.filter(x=>S.has(kf(x)))].slice(0,n))}
 const bank=id=>((window.BANK||{})[id]||[]);
 const size=id=>baseId(id)==='noi-doi'?bank(id).reduce((a,s)=>a+s.split(';').length,0):baseId(id)==='nhieu-nghia'?bank(id).reduce((a,s)=>a+(s.startsWith('P|')?1:s.split('|').length-2),0):bank(id).length;
 const unit=id=>(id=baseId(id))==='noi-doi'?'cặp':id==='thi-thu'?'đề':id==='xep-doan'?'đoạn':id==='doc-hieu'?'bài đọc':id==='cap-tu'?'lượt':'câu';
@@ -94,7 +96,7 @@ async function saveRound(id,s,essay){
   if(isStudent()){
     const before=new Set(badgeList(xu,essays).filter(b=>b.ok).map(b=>b.id));
     const solved=solvedKeys(),perfect=!!(G&&G.seen&&G.seen.size&&!G.anyDirty&&baseId(id)!=='thi-thu');
-    try{const d=await call('save',{game:id,stars:s,essay,xu:delta,solved,maxStreak:G?G.maxStreak||0:0,perfect});essays=d.essays||essays;xu=d.xu||xu;renderTotal();if(G&&baseId(G.g.id)==='thi-thu')renderEssays();
+    try{const d=await call('save',{game:id,stars:s,essay,xu:delta,solved,tried:G&&G.dirty?[...G.dirty]:[],maxStreak:G?G.maxStreak||0:0,perfect});essays=d.essays||essays;xu=d.xu||xu;renderTotal();if(G&&baseId(G.g.id)==='thi-thu')renderEssays();
       // thưởng xu cho huy hiệu mới mở (và huy hiệu mở từ trước khi có thưởng), mỗi huy hiệu một lần
       const now=badgeList(xu,essays),fresh=new Set(now.filter(b=>b.ok&&!before.has(b.id)).map(b=>b.id)),bonus=[...(d.bonus||[])];
       const unpaid=now.filter(b=>b.ok&&!(xu.paid||[]).includes(b.id));
@@ -135,7 +137,7 @@ function goalsHtml(L){
   return `<div class="goals">${giftRow}${badgeRow}${streakRow}${goalRow}</div>`;
 }
 function rulesHtml(cls){
-  const R=[['up','+10','Đúng ngay lần đầu'],['up','+5','Đúng ở lần thử 2'],['dn','−2','Mỗi lần sai'],['gr','0','Câu đã làm đúng rồi'],['fl','+50','Đúng liền 5 câu'],['fl','+100','Đúng liền 10 câu'],['up','+10','Mỗi sao mới của trò'],['up','+15','Chơi mỗi ngày']];
+  const R=[['up','+10','Đúng ngay lần đầu'],['gr','1 lần','Mỗi câu chỉ trả lời 1 lần'],['dn','−2','Mỗi lần sai'],['gr','0','Câu đã làm đúng rồi'],['fl','+50','Đúng liền 5 câu'],['fl','+100','Đúng liền 10 câu'],['up','+10','Mỗi sao mới của trò'],['up','+15','Chơi mỗi ngày']];
   return `<div class="rules${cls?' '+cls:''}"><p class="rt">${COIN}Cách kiếm xu đổi quà</p><div class="rg">${R.map(([c,n,l])=>`<div class="rr ${c}"><b>${n}</b><span>${l}</span></div>`).join('')}</div><div class="rmul"><p>Hệ số xu theo đảo (nhân với số ở trên)</p><span class="isl-tag c4">Viết đoạn ×2</span><span class="isl-tag c0">Mở rộng câu ×1</span><span class="isl-tag c1">Câu ghép, Tu từ, Từ ngữ ×½</span></div><p class="rgi">Mức Nâng cao: xu thưởng gấp đôi, sai trừ 4 xu. Đủ xu thì đổi quà ngay hoặc để dành. Đổi quà sẽ trừ xu.</p></div>`;
 }
 function acct(){
@@ -202,13 +204,14 @@ function xuJudge(prev){
   if(!G||isStaff()||G.ended)return;const m=G.msg;if(!m||m===prev)return;
   // đơn vị tính xu: mỗi câu hỏi; trò nhiều bước (một câu có nhiều bước) chỉ tính xu một lần, ở bước đúng đầu tiên
   const u=G.qs?'q'+G.i:rowKey(),paid=(G.paidU=G.paidU||new Set());
+  if(G.lastU!==u){G.lastU=u;G.since=0}  // sang câu mới thì đếm lại số lần trả lời
   if(m.k==='ok'){const tries=G.since;G.since=0;
     if(u!=null&&paid.has(u)){if(tries>0)G.streak=0}
     else{if(u!=null)paid.add(u);
       const k=rowKey(),old=k!=null&&solvedSet().has(k);
       if(old){if(tries===0&&!(G.oldNoted=G.oldNoted||new Set()).has(k)){G.oldNoted.add(k);toast(0,'Câu này em đã làm đúng rồi · không cộng xu')}if(tries>0)G.streak=0}
       else if(tries===0){xuAdd(XU.first,'Đúng ngay lần đầu');G.streak++;G.maxStreak=Math.max(G.maxStreak||0,G.streak);if(G.streak%10===0)xuAdd(XU.s10,`Chuỗi ${G.streak} câu đúng liên tiếp!`);else if(G.streak%5===0)xuAdd(XU.s5,`Chuỗi ${G.streak} câu đúng liên tiếp!`)}
-      else{if(tries===1)xuAdd(XU.second,'Đúng ở lần thử thứ hai');else toast(0,'Đúng sau nhiều lần thử · không cộng xu');G.streak=0}}}
+      else G.streak=0}}  // mỗi câu chỉ trả lời 1 lần: đã sai thì không còn xu cho câu đó
   else if(m.k==='bad'||m.k==='weak'){G.since++;markDirty();const w=m.k==='weak'?'Gần đúng':'Trả lời sai';xuAdd(XU.wrong,G.streak>=2?w+', mất chuỗi':w);G.streak=0}
   const el=document.getElementById('streak');if(el)el.innerHTML=streakHtml();
 }
@@ -256,7 +259,8 @@ function renderQuiz(){
 function clickPick(j){
   if(G.done)return;const o=G.qs[G.i].options[j];G.sel=j;
   if(o.ok===true){if(!G.tried.length)G.correct++;G.done=true;G.msg={k:'ok',t:o.why}}
-  else{G.tried.push(j);G.shake=j;G.msg={k:o.ok==='weak'?'weak':'bad',t:o.why}}
+  else{const opts=G.qs[G.i].options,r=opts.findIndex(x=>x.ok===true);G.tried.push(j);G.shake=j;G.sel=r;G.done=true;  // chỉ trả lời 1 lần
+    G.msg={k:o.ok==='weak'?'weak':'bad',t:`${String(o.why).replace(/\s*(Thử|Hãy thử|Hãy nghĩ lại|Thử nghĩ)[^.]*[.?]\s*$/,'')} Đáp án đúng: “${opts[r].label}”.`}}
   render();
 }
 
@@ -298,9 +302,9 @@ BUILD['cay-cau']=()=>{
     G.shake=null;
   };
   G.onAct=d=>{
-    const s=d.s,j=+d.j,o=G.rounds[G.i].opts[s][j],label=lc(noComma(o[0]));
+    const s=d.s,j=+d.j,o=G.rounds[G.i].opts[s][j],label=lc(noComma(o[0]));if(G.res[s]===false)return;
     if(o[1]===s){const had=G.pick[s]!=null;G.pick[s]=j;if(!(s in G.res))G.res[s]=true;G.msg=had?{k:'info',t:`Đã đổi sang “${label}”, câu vẫn đúng.`}:{k:'ok',t:`“${label}” trả lời câu hỏi ${SL[s].q}`}}
-    else{G.wrong[s]=(G.wrong[s]||[]).concat(j);G.res[s]=false;G.shake=s+j;G.msg={k:'bad',t:`“${label}” trả lời câu hỏi ${SL[o[1]].q} Hãy tìm cụm từ trả lời câu hỏi ${SL[s].q}`}}
+    else{const R=G.rounds[G.i].opts[s],r=R.findIndex(x=>x[1]===s);G.wrong[s]=(G.wrong[s]||[]).concat(j);G.res[s]=false;G.pick[s]=r;G.shake=s+j;G.msg={k:'bad',t:`“${label}” trả lời câu hỏi ${SL[o[1]].q} Cụm đúng cho câu hỏi ${SL[s].q} là “${lc(noComma(R[r][0]))}”.`}}
     render();
   };
   G.onNext=()=>{G.correct+=Object.values(G.res).filter(Boolean).length;G.total+=4;G.i++;reset()};
@@ -328,7 +332,7 @@ BUILD['tau-chu']=()=>{
   };
   G.onAct=d=>{const c=G.trains[G.i].filter(p=>p[1])[G.k];if(!c)return;const k=d.k;
     if(k===c[1]){if(!G.tried.length)G.correct++;G.total++;G.k++;G.tried=[];G.msg={k:'ok',t:`“${noComma(c[0])}” trả lời câu hỏi ${KINDS[k].q} Đây là trạng ngữ chỉ ${KINDS[k].n.toLowerCase()}.`}}
-    else{G.tried.push(k);G.shake=1;G.msg={k:'bad',t:`Toa này không trả lời câu hỏi ${KINDS[k].q} Thử đặt câu hỏi khác cho toa nhé.`}}
+    else{G.total++;G.k++;G.tried=[];G.shake=1;G.msg={k:'bad',t:`Toa “${noComma(c[0])}” trả lời câu hỏi ${KINDS[c[1]].q} Đây là trạng ngữ chỉ ${KINDS[c[1]].n.toLowerCase()}.`}}
     render()};
   G.onNext=()=>{G.i++;G.k=0;G.tried=[];G.msg=null};
 };
@@ -352,7 +356,7 @@ BUILD['tham-tu']=()=>{
   };
   G.onAct=d=>{if(G.ph>=3)return;const S=G.sents[G.i],j=+d.j,want=PHASES[G.ph];
     if(S[j][1]===want){if(!G.tried.length)G.correct++;G.total++;G.ph++;G.tried=[];G.msg={k:'ok',t:`“${noComma(S[j][0])}” là ${ROLES[want].n}. ${ROLES[want].h}`}}
-    else{G.tried.push(j);G.shake=j;G.msg={k:'bad',t:`Đây chưa phải ${ROLES[want].n}. ${ROLES[want].h}`}}
+    else{const r=S.find(c=>c[1]===want);G.total++;G.ph++;G.tried=[];G.shake=j;G.msg={k:'bad',t:`Đây chưa phải ${ROLES[want].n}. ${cap(ROLES[want].n)} là “${noComma(r[0])}”. ${ROLES[want].h}`}}
     render()};
   G.onNext=()=>{G.i++;G.ph=0;G.tried=[];G.msg=null};
 };
@@ -420,7 +424,7 @@ BUILD['noi-doi']=()=>{
     if(d.side==='L'){G.selL=j;G.msg=null;return render()}
     if(G.selL==null){G.msg={k:'info',t:'Chạm vào một sự vật ở cột trái trước nhé.'};return render()}
     if(j===G.selL){G.matched.push(j);G.total++;if(!G.miss.includes(j))G.correct++;G.msg={k:'ok',t:`${S[j][0]} ${S[j][1]}.`};G.selL=null}
-    else{if(!G.miss.includes(G.selL))G.miss.push(G.selL);G.shake=j;G.msg={k:'bad',t:`“${S[G.selL][0]} ${S[j][1]}” nghe chưa hợp. Thử từ khác nhé.`}}
+    else{const L=G.selL;G.miss.push(L);G.matched.push(L);G.total++;G.shake=j;G.selL=null;G.msg={k:'bad',t:`“${S[L][0]} ${S[j][1]}” nghe chưa hợp. Đúng là: ${S[L][0]} ${S[L][1]}.`}}
     render()};
   G.onNext=()=>{G.i++;init();G.msg=null};
 };
@@ -462,7 +466,7 @@ BUILD['xep-doan']=()=>{
   };
   G.onAct=d=>{const X=G.paras[G.i],j=+d.j,want=G.placed.length;
     if(j===want){G.placed.push(j);G.total++;if(!G.miss)G.correct++;G.miss=false;G.msg=G.placed.length===X.s.length?{k:'ok',t:'Đoạn văn đã mạch lạc. Bé đọc to cả đoạn nhé.'}:{k:'ok',t:'Câu này đúng vị trí. Câu tiếp theo là câu nào?'}}
-    else{G.miss=true;G.shake=j;G.msg={k:'bad',t:want===0?'Câu này chưa phải câu mở đầu. Câu mở đầu thường giới thiệu thời gian hoặc sự vật được nói tới.':'Câu này chưa phải câu tiếp theo. Chú ý các từ nối như “đầu tiên”, “rồi”, “sau đó”, “cuối cùng”.'}}
+    else{G.placed.push(want);G.total++;G.miss=false;G.shake=j;G.msg={k:'bad',t:`${want===0?'Câu này chưa phải câu mở đầu.':'Câu này chưa phải câu tiếp theo.'} Câu đúng ở vị trí này: “${X.s[want]}”`}}
     render()};
   G.onNext=()=>{G.i++;init();G.msg=null};
 };
@@ -570,7 +574,7 @@ BUILD['phan-loai']=()=>{
     if(G.sel==null){G.msg={k:'info',t:'Chạm vào một từ có viền trong câu trước nhé.'};return render()}
     const j=G.sel,p=S[j],k=d.b;
     if(p.k===k){G.placed[j]=true;G.total++;if(!G.miss[j])G.correct++;G.sel=null;G.msg={k:'ok',t:`“${p.w}” là ${WK[k].n.toLowerCase()}. ${WK[k].h}`}}
-    else{G.miss[j]=true;G.shake=k;G.msg={k:'bad',t:`“${p.w}” không phải ${WK[k].n.toLowerCase()}. Nhớ lại: ${WK[k].h}`}}
+    else{G.miss[j]=true;G.placed[j]=true;G.total++;G.sel=null;G.shake=k;G.msg={k:'bad',t:`“${p.w}” không phải ${WK[k].n.toLowerCase()}, mà là ${WK[p.k].n.toLowerCase()}. ${WK[p.k].h}`}}
     render();
   };
   G.onNext=()=>{G.i++;reset()};
@@ -580,7 +584,8 @@ BUILD['phan-loai']=()=>{
 const hl=s=>s.replace(/\*([^*]+)\*/g,'<span class="nhu">$1</span>');
 BUILD['nhieu-nghia']=()=>{
   const all=qbank('nhieu-nghia'),sets=all.filter(s=>!s.startsWith('P|')),pairs=all.filter(s=>s.startsWith('P|')),qs=[];
-  pickNew(sets,2,s=>all.indexOf(s)).forEach(s=>{const [w,gloss,...ss]=s.split('|');shuffle(ss).forEach(x=>{const [sent,a]=x.split('=');
+  // mỗi lượt: 4 từ, mỗi từ chỉ hỏi 1 câu (không hỏi liền nghĩa gốc rồi nghĩa chuyển của cùng một từ)
+  pickNew(sets,4,s=>all.indexOf(s)).forEach(s=>{const [w,gloss,...ss]=s.split('|');shuffle(ss).slice(0,1).forEach(x=>{const [sent,a]=x.split('=');
     qs.push({intro:`<p class="ask">Từ <b>“${w}”</b> trong câu dưới đây mang nghĩa gốc hay nghĩa chuyển?</p>`,
       options:[opt('Nghĩa gốc',a==='g',a==='g'?`Đây là nghĩa gốc của “${w}”: ${gloss}.`:`Nghĩa gốc của “${w}” là ${gloss}. Ở câu này, từ đã chuyển sang chỉ sự vật khác có nét giống.`),
                opt('Nghĩa chuyển',a==='c',a==='c'?`Đây là nghĩa chuyển: từ nghĩa gốc (${gloss}) chuyển sang chỉ sự vật khác có nét giống.`:`Ở câu này, “${w}” dùng đúng nghĩa gốc: ${gloss}.`)],
@@ -589,7 +594,7 @@ BUILD['nhieu-nghia']=()=>{
     qs.push({intro:'<p class="ask">Hai từ được tô màu là từ nhiều nghĩa hay từ đồng âm?</p>',
       options:[opt('Từ nhiều nghĩa',a==='nn',a==='nn'?why:'Thử nghĩ: hai nghĩa này có liên quan gì với nhau không?'),opt('Từ đồng âm',a==='da',a==='da'?why:'Hai nghĩa này có nét liên quan với nhau, hãy nghĩ lại.')],
       view:()=>two.split(' / ').map(hl).join('<br>'),key:all.indexOf(s)})});
-  G.qs=qs;resetQuiz();
+  G.qs=shuffle(qs);resetQuiz();
 };
 
 /* ---------- Cặp từ đối đầu ---------- */
@@ -615,10 +620,10 @@ BUILD['cap-tu']=()=>{
     const it=G.items[G.i],j=+d.j,c=it.chips[j];
     if(it.type==='p'){
       if(c===it.s||c===it.a){const k=c===it.s?'s':'a';G.got[k]=true;G.total++;if(!G.missed)G.correct++;G.missed=false;G.msg={k:'ok',t:`“${c}” ${k==='s'?'đồng nghĩa':'trái nghĩa'} với “${it.w}”.`}}
-      else{G.bad.push(c);G.missed=true;G.shake=j;G.msg={k:'bad',t:`“${c}” không đồng nghĩa, cũng không trái nghĩa với “${it.w}”.`}}
+      else{G.bad.push(c);G.total+=(G.got.s?0:1)+(G.got.a?0:1);G.got.s=G.got.a=true;G.missed=false;G.shake=j;G.msg={k:'bad',t:`“${c}” không đồng nghĩa, cũng không trái nghĩa với “${it.w}”. Đáp án: đồng nghĩa “${it.s}”, trái nghĩa “${it.a}”.`}}
     }else{
       if(c===it.ans){G.got.t=true;G.total++;if(!G.missed)G.correct++;G.msg={k:'ok',t:it.why[c]}}
-      else{G.bad.push(c);G.missed=true;G.shake=j;G.msg={k:'bad',t:it.why[c]}}
+      else{G.bad.push(c);G.got.t=true;G.total++;G.missed=false;G.shake=j;G.msg={k:'bad',t:`${it.why[c]} Từ đúng: “${it.ans}”.`}}
     }
     render();
   };
@@ -646,12 +651,12 @@ BUILD['chinh-ta']=()=>{
     const it=G.items[G.i];
     if(G.ph===0&&d.j!=null){const j=+d.j,t=it.toks[j];
       if(t.bad){G.ph=1;G.tried=[];G.msg={k:'info',t:`Đúng là chữ “${t.x}” viết sai. Giờ chọn cách viết đúng.`}}
-      else{G.missed=true;if(!G.tried.includes(j))G.tried.push(j);G.shake=j;G.msg={k:'bad',t:`Chữ “${t.x.replace(/[.,!?;:]+$/,'')}” viết đúng rồi. Tìm chữ khác nhé.`}}
+      else{G.missed=true;G.ph=1;G.tried=[];G.shake=j;G.msg={k:'bad',t:`Chữ “${t.x.replace(/[.,!?;:]+$/,'')}” viết đúng rồi. Chữ viết sai là “${it.wrong}”. Giờ chọn cách viết đúng.`}}
       return render();
     }
     if(G.ph===1&&d.o!=null){const o=it.opts[+d.o];
       if(o===it.right){G.ph=2;G.total++;if(!G.missed)G.correct++;G.msg={k:'ok',t:`Viết đúng là “${it.right}”. ${it.tip}`}}
-      else{G.missed=true;G.tried.push('o'+d.o);G.shake='o'+d.o;G.msg={k:'bad',t:`“${o}” chưa đúng. Gợi ý: ${it.tip}`}}
+      else{G.ph=2;G.total++;G.missed=false;G.shake='o'+d.o;G.msg={k:'bad',t:`“${o}” chưa đúng. Viết đúng là “${it.right}”. ${it.tip}`}}
       render();
     }
   };
@@ -681,12 +686,12 @@ BUILD['dau-cau']=()=>{
     const it=G.items[G.i],slots=it.parts.filter(p=>p.m);
     if(d.m!=null&&G.k<slots.length){const want=slots[G.k].m;
       if(d.m===want){G.total++;if(!G.missed)G.correct++;G.missed=false;G.tried=[];G.k++;G.msg={k:'ok',t:MHINT[want]}}
-      else{G.missed=true;G.tried.push(d.m);G.shake=1;G.msg={k:'bad',t:`Dấu “${d.m}”: ${MHINT[d.m]} Chỗ này cần dấu khác.`}}
+      else{G.total++;G.missed=false;G.tried=[];G.k++;G.shake=1;G.msg={k:'bad',t:`Chỗ này cần dấu “${want}”, không phải “${d.m}”. ${MHINT[want]}`}}
       return render();
     }
     if(d.kind){const want=it.kind;
       if(d.kind===want){G.kdone=true;G.total++;if(!G.missed)G.correct++;G.missed=false;G.msg={k:'ok',t:KIEU[want][1]}}
-      else{G.missed=true;G.tried.push('k'+d.kind);G.msg={k:'bad',t:`Chưa phải ${KIEU[d.kind][0].toLowerCase()}. ${KIEU[d.kind][1]}`}}
+      else{G.kdone=true;G.total++;G.missed=false;G.msg={k:'bad',t:`Chưa phải ${KIEU[d.kind][0].toLowerCase()}. Đây là ${KIEU[want][0].toLowerCase()}: ${KIEU[want][1]}`}}
       render();
     }
   };
