@@ -92,8 +92,14 @@ function ensureGoal(p) {   // trả về true nếu vừa đặt gợi ý mới
   if (x.goal && x.goal.game && GAME_IDS.includes(x.goal.game)) return false;
   p.xu = { ...x, goal: { game: goalPick(p) } }; return true;
 }
+// Hũ xu mỗi ngày: xu kiếm trong ngày vào hũ; nộp 1 đoạn văn ở Phòng thi thử (đủ 5 câu trở lên) để mở hũ (+50 xu).
+// Hũ hôm nay và hôm qua mở đủ; hũ cũ hơn (tới 7 ngày) còn 50%; cũ hơn nữa thì mất.
+const jarValue = x => { const t = Date.parse(vnDay()); let a = 0; for (const [d, v] of Object.entries(x.jar || {})) { const age = Math.round((t - Date.parse(d)) / DAY); a += age <= 1 ? v : age <= 7 ? Math.floor(v / 2) : 0; } return Math.max(0, a); };
+const wroteToday = x => x.wrote === vnDay();
+const essaySentences = t => String(t || '').split(/[.!?…]+/).filter(z => z.trim().split(/\s+/).length >= 2).length;
+function addXu(x, n) { if (wroteToday(x)) { x.total = Math.max(0, (x.total || 0) + n); x.peak = Math.max(x.peak || 0, x.total); } else { const d = vnDay(); x.jar = { ...(x.jar || {}) }; x.jar[d] = Math.max(0, (x.jar[d] || 0) + n); } }
 const goalLeft = x => 3 - (x.gdone && x.gdone.day === vnDay() ? x.gdone.n : 0);
-const xuOut = x => { x = x || {}; return { total: x.total || 0, goal: x.goal || null, goalLeft: goalLeft(x), peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()),
+const xuOut = x => { x = x || {}; return { total: x.total || 0, jar: jarValue(x), wrote: wroteToday(x), goal: x.goal || null, goalLeft: goalLeft(x), peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()),
   stats: { solved: x.solved || {}, tried: x.tried || {}, maxStreak: x.maxStreak || 0, perfect: x.perfect || 0, bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
 // Thưởng xu khi mở khóa huy hiệu (mỗi huy hiệu một lần). Danh sách huy hiệu do trình duyệt tính; máy chủ giữ mức thưởng.
 const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 200, write2s: 300, write3s: 400, writeN5: 600, writeN10: 800, writeN20: 1200, king: 1000, legend: 3000 };
@@ -217,7 +223,17 @@ async function handle(req, res) {
       bonus.push(["Chơi hôm nay", 15]); x.days = [...x.days, today].slice(-60);
       const s = dayStreak(x.days, today); if (s > 0 && s % 7 === 0) bonus.push([`Chơi đều ${s} ngày liên tiếp`, 100]);
     }
-    x.total = Math.max(0, (x.total || 0) + delta + bonus.reduce((a, b) => a + b[1], 0)); x.peak = Math.max(x.peak || 0, x.total);
+    const gain = delta + bonus.reduce((a, b) => a + b[1], 0);
+    let jarOpened = 0;
+    if (isThi(game)) {
+      // bài thi thử cộng thẳng; bài đủ câu thì mở hũ
+      x.total = Math.max(0, (x.total || 0) + gain); x.peak = Math.max(x.peak || 0, x.total);
+      if (!wroteToday(x) && body.essay && essaySentences(body.essay.text) >= 5) {
+        jarOpened = jarValue(x); bonus.push(["Mở hũ xu", jarOpened], ["Thưởng mở hũ", 50]);
+        x.total += jarOpened + 50; x.peak = Math.max(x.peak || 0, x.total); x.jar = {}; x.wrote = vnDay();
+      }
+    } else addXu(x, gain);
+    p.jarOpened = jarOpened;
     // thống kê cho huy hiệu: các câu (số thứ tự trong ngân hàng) đã trả lời đúng ngay lần đầu, chuỗi dài nhất, số lượt hoàn hảo
     const sv = (Array.isArray(body.solved) ? body.solved : []).map(n => parseInt(n, 10)).filter(n => n >= 0 && n < (BANK_ROWS[game] || 0)).slice(0, 50);
     if (sv.length && !isThi(game)) { x.solved = { ...(x.solved || {}) }; x.solved[game] = [...new Set([...(x.solved[game] || []), ...sv])].sort((a, b) => a - b); }
@@ -232,14 +248,14 @@ async function handle(req, res) {
       p.essays = [{ at: new Date().toISOString(), de: String(body.essay.de || '').slice(0, 300), text: String(body.essay.text).slice(0, 5000), stars, nc: game.endsWith('-nc') }, ...p.essays].slice(0, 50);
     }
     await progPut(p);
-    return out({ ...report({ code: me.code, name: me.name, active: true }, p, false), bonus: p.bonus });
+    return out({ ...report({ code: me.code, name: me.name, active: true }, p, false), bonus: p.bonus, jarOpened: p.jarOpened || 0, inJar: !wroteToday(p.xu || {}) && !isThi(game) });
   }
   if (a === "badge.claim") {
     const me = need(await who(req), ["student"]);
     const p = await prog(me.code), x = { ...(p.xu || {}) }; x.paid = Array.isArray(x.paid) ? x.paid : [];
     const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(String))].filter(id => badgeReward(id) > 0 && !x.paid.includes(id) && earned(id, p)).slice(0, 80);
     const got = ids.map(id => [id, badgeReward(id)]);
-    if (got.length) { x.paid = [...x.paid, ...ids]; x.total = (x.total || 0) + got.reduce((s, g) => s + g[1], 0); x.peak = Math.max(x.peak || 0, x.total); p.xu = x; await progPut(p); }
+    if (got.length) { x.paid = [...x.paid, ...ids]; addXu(x, got.reduce((s, g) => s + g[1], 0)); p.xu = x; await progPut(p); }
     return out({ xu: xuOut(x), got });
   }
   if (a === "gift.request") {

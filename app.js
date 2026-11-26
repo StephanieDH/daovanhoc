@@ -102,7 +102,7 @@ async function saveRound(id,s,essay){
       const unpaid=now.filter(b=>b.ok&&!(xu.paid||[]).includes(b.id));
       if(unpaid.length){try{const c=await call('badge.claim',{ids:unpaid.map(b=>b.id)});xu=c.xu||xu;renderTotal();
         (c.got||[]).forEach(([bid,n])=>{const b=unpaid.find(z=>z.id===bid),lab=(fresh.has(bid)?'Huy hiệu mới: ':'Thưởng huy hiệu: ')+(b?b.name:bid);bonus.push([lab,n]);toast(n,lab,'badge')})}catch(e){}}
-      return {bonus,total:xu.total,badges:[]}}
+      return {bonus,total:xu.total,badges:[],inJar:!!d.inJar,jarOpened:d.jarOpened||0}}
     catch(e){renderTotal();return {bonus:[],total:null,err:e.message}}
   }
   xu.total=Math.max(0,(xu.total||0)+delta);xu.peak=Math.max(xu.peak||0,xu.total);LS.set('dcv-xu-guest',{total:xu.total,peak:xu.peak});renderTotal();
@@ -113,7 +113,7 @@ function renderTotal(){
   // tổng sao gộp Cơ bản + Nâng cao (khớp với báo cáo)
   const ids=[...GAMES.map(g=>g.id),...NCG().map(g=>g.id)],t=ids.reduce((a,id)=>a+(best[id]||0),0);
   document.getElementById('total').innerHTML=(me?`<span class="who">${esc(isStudent()?me.name+' · '+me.code:me.name)}</span>`:'')+
-    (isStaff()?`<a class="who-link" href="#theo-doi">${me.role==='parent'?'Báo cáo của con':'Bảng theo dõi'}</a>`:`<svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg>${t}/${ids.length*3}<a class="xu-link" href="#qua" title="Kệ quà">${COIN}<b>${Math.max(0,(xu.total||0)+((G&&G.xu)||0))}</b> xu</a>`);
+    (isStaff()?`<a class="who-link" href="#theo-doi">${me.role==='parent'?'Báo cáo của con':'Bảng theo dõi'}</a>`:`<svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg>${t}/${ids.length*3}<a class="xu-link" href="#qua" title="Kệ quà">${COIN}<b>${Math.max(0,(xu.total||0)+(jarOn()?0:((G&&G.xu)||0)))}</b> xu</a>${isStudent()&&!xu.wrote?`<a class="jar-pill" href="#thi-thu" title="Viết 1 đoạn văn để mở hũ">🔒 Hũ hôm nay: <b>${Math.max(0,(xu.jar||0)+(jarOn()?((G&&G.xu)||0):0))}</b> xu</a>`:''}`);
 }
 
 let G=null;
@@ -134,11 +134,12 @@ function goalsHtml(L){
   // gợi ý kiếm thêm xu (máy chủ chọn trò bé ít chơi; xong một lượt có câu mới +50 xu, tối đa 3 lần/ngày)
   const gl=xu.goal,gg=gl&&([...GAMES,...NCG()].find(x=>x.id===gl.game)),gleft=xu.goalLeft??3;
   const goalRow=gg?`<div class="gl"><span>Gợi ý kiếm thêm xu</span><div class="goalbox"><span>Chơi 1 lượt <b>${esc(gg.name)}${gg.nc?' · Nâng cao':''}</b></span><a class="primary sm" href="#${gg.id}">Chơi ngay →</a></div><span class="fine">${gleft>0?`Xong một lượt có câu mới: +50 xu · hôm nay còn ${gleft} lần`:'Hôm nay đã nhận đủ 3 lần thưởng, mai thưởng tiếp nhé.'}</span></div>`:'';
-  return `<div class="goals">${giftRow}${badgeRow}${streakRow}${goalRow}</div>`;
+  const jarRow=`<div class="gl"><span class="jar-t">🔒 Hũ xu hôm nay đang chờ mở</span><div class="goalbox"><span>Viết 1 đoạn văn ở Phòng thi thử để mở hũ <b>${vn(xu.jar||0)} xu</b> + thưởng <b>50 xu</b></span><a class="primary sm" href="#thi-thu">Viết ngay ✍️</a></div><span class="fine">Viết đủ số câu tối thiểu của đề là mở được. Hũ hôm qua (nếu có) cũng mở cùng lúc.</span></div>`;
+  return `<div class="goals">${giftRow}${badgeRow}${streakRow}${isStudent()&&!xu.wrote?jarRow:goalRow}</div>`;
 }
 function rulesHtml(cls){
   const R=[['up','+10','Đúng ngay lần đầu'],['gr','1 lần','Mỗi câu chỉ trả lời 1 lần'],['dn','−2','Mỗi lần sai'],['gr','0','Câu đã làm đúng rồi'],['fl','+50','Đúng liền 5 câu'],['fl','+100','Đúng liền 10 câu'],['up','+10','Mỗi sao mới của trò'],['up','+15','Chơi mỗi ngày']];
-  return `<div class="rules${cls?' '+cls:''}"><p class="rt">${COIN}Cách kiếm xu đổi quà</p><div class="rg">${R.map(([c,n,l])=>`<div class="rr ${c}"><b>${n}</b><span>${l}</span></div>`).join('')}</div><div class="rmul"><p>Hệ số xu theo đảo (nhân với số ở trên)</p><span class="isl-tag c4">Viết đoạn ×2</span><span class="isl-tag c0">Mở rộng câu ×1</span><span class="isl-tag c1">Câu ghép, Tu từ, Từ ngữ ×½</span></div><p class="rgi">Mức Nâng cao: xu thưởng gấp đôi, sai trừ 4 xu. Đủ xu thì đổi quà ngay hoặc để dành. Đổi quà sẽ trừ xu.</p></div>`;
+  return `<div class="rules${cls?' '+cls:''}"><p class="rt">${COIN}Cách kiếm xu đổi quà</p><div class="rg">${R.map(([c,n,l])=>`<div class="rr ${c}"><b>${n}</b><span>${l}</span></div>`).join('')}</div><div class="rmul"><p>Hệ số xu theo đảo (nhân với số ở trên)</p><span class="isl-tag c4">Viết đoạn ×2</span><span class="isl-tag c0">Mở rộng câu ×1</span><span class="isl-tag c1">Câu ghép, Tu từ, Từ ngữ ×½</span></div><p class="rjar">🔒 <b>Hũ xu mỗi ngày:</b> xu kiếm được trong ngày vào hũ; viết 1 đoạn văn ở Phòng thi thử để mở hũ (+50 xu). Hũ chưa mở giữ được 2 ngày, sau đó còn 50%.</p><p class="rgi">Mức Nâng cao: xu thưởng gấp đôi, sai trừ 4 xu. Đủ xu thì đổi quà ngay hoặc để dành. Đổi quà sẽ trừ xu.</p></div>`;
 }
 function acct(){
   if(isStudent()){const L=badgeList(xu,essays);
@@ -191,10 +192,12 @@ function next(){
   if(G.onNext)G.onNext();else{G.total++;G.i++;resetQuiz()}
   render();window.scrollTo(0,0);
 }
+// hũ xu: chưa viết đoạn văn hôm nay thì xu cộng (ngoài Phòng thi thử) vào hũ
+const jarOn=()=>isStudent()&&!(xu&&xu.wrote)&&!(G&&G.g&&baseId(G.g.id)==='thi-thu');
 function toast(n,label,cls){
   let box=document.getElementById('toasts');if(!box){box=document.createElement('div');box.id='toasts';box.setAttribute('aria-live','polite');document.body.appendChild(box)}
   while(box.children.length>=2)box.firstChild.remove();
-  const el=document.createElement('div');el.className='toast '+(cls||(n>0?'up':n<0?'down':'zero'));el.textContent=cls==='badge'?label+' · +'+n+' xu':(n>0?'+'+n+' xu · ':n<0?n+' xu · ':'')+label;box.appendChild(el);setTimeout(()=>el.remove(),2300);
+  const el=document.createElement('div');el.className='toast '+(cls||(n>0?'up':n<0?'down':'zero'));const J=jarOn()?' vào hũ 🔒':'';el.textContent=cls==='badge'?label+' · +'+n+' xu'+J:(n>0?'+'+n+' xu'+J+' · ':n<0?n+' xu · ':'')+label;if(J&&n>0&&cls!=='badge')el.className='toast jarT';box.appendChild(el);setTimeout(()=>el.remove(),2300);
 }
 // hệ số xu theo đảo (phương án A, 25/11/2026): Mở rộng câu ×1; Câu ghép, Tu từ, Từ ngữ ×½; Viết đoạn ×2
 const ISL_MUL=[1,0.5,0.5,0.5,2];
@@ -220,7 +223,7 @@ function xuSumHtml(lines,delta,r){
   const rows=lines.map(o=>`<li><span>${esc(o.l)}${o.c>1?` × ${o.c}`:''}</span><b class="${o.n<0?'neg':''}">${o.n>0?'+':''}${o.n*o.c}</b></li>`).join('');
   const bon=r?(r.bonus||[]).map(([l,n])=>`<li class="bonus"><span>${esc(l)}</span><b>+${n}</b></li>`).join(''):'';
   const sum=delta+(r?(r.bonus||[]).reduce((a,b)=>a+b[1],0):0);
-  return `<h3>Xu của lượt này</h3><ul>${rows||'<li><span>Chưa có xu nào</span><b>0</b></li>'}${bon}</ul><p class="xu-total">${sum>=0?'+':''}${sum} xu${r&&r.total!=null?` · Tổng: ${r.total} xu`:r&&r.err?' · Chưa lưu được, kiểm tra mạng.':r?'':' · Đang lưu…'}</p>${r&&r.badges&&r.badges.length?`<p class="newb">Huy hiệu mới: ${r.badges.map(esc).join(', ')}</p>`:''}${isStudent()?'<a class="ghost sm" href="#qua">Xem kệ quà</a> <a class="ghost sm" href="#huy-hieu">Xem huy hiệu</a>':me?'':'<p class="fine">Nhập mã học sinh ở trang chủ để được đổi quà.</p>'}`;
+  return `<h3>Xu của lượt này</h3><ul>${rows||'<li><span>Chưa có xu nào</span><b>0</b></li>'}${bon}</ul><p class="xu-total">${sum>=0?'+':''}${sum} xu${r&&r.inJar?` · đã vào hũ 🔒 (hũ hôm nay: ${vn(xu.jar||0)} xu, viết 1 đoạn văn để mở)`:r&&r.total!=null?` · Tổng: ${r.total} xu`:r&&r.err?' · Chưa lưu được, kiểm tra mạng.':r?'':' · Đang lưu…'}</p>${r&&r.badges&&r.badges.length?`<p class="newb">Huy hiệu mới: ${r.badges.map(esc).join(', ')}</p>`:''}${isStudent()?'<a class="ghost sm" href="#qua">Xem kệ quà</a> <a class="ghost sm" href="#huy-hieu">Xem huy hiệu</a>':me?'':'<p class="fine">Nhập mã học sinh ở trang chủ để được đổi quà.</p>'}`;
 }
 function renderEnd(){
   if(G.endHtml){$app.innerHTML=G.endHtml;return}
@@ -545,7 +548,7 @@ function submitThi(){
     if(!first&&!gain)toast(0,'Bài chưa tăng sao so với lần trước · không cộng xu')}
   const lines=groupLines(G.xuLines),delta=G.xu;G.xuLines=[];
   document.getElementById('result').innerHTML=`<div class="msg ${st===3?'ok':'weak'}"><b>${stars(st)}</b><span>${st===3?'Bài làm đạt đủ yêu cầu của đề. Giỏi lắm!':`Bài làm đạt ${met}/${n} yêu cầu. Xem bảng kiểm tra để sửa và nộp lại nhé.`}${isStudent()?' Bài đã được lưu, thầy cô sẽ đọc và nhận xét.':isStaff()?' (Chơi thử: bài không được lưu.)':''}</span></div>${isStaff()?'':`<div class="xu-sum" id="xusum">${xuSumHtml(lines,delta,null)}</div>`}`;
-  saveRound(G.g.id,st,isStudent()?{de:G.de.de,text:G.text}:undefined).then(r=>{const el=document.getElementById('xusum');if(el)el.innerHTML=xuSumHtml(lines,delta,r)});
+  saveRound(G.g.id,st,isStudent()?{de:G.de.de,text:G.text}:undefined).then(r=>{const el=document.getElementById('xusum');if(el)el.innerHTML=(r&&r.jarOpened!=null&&(r.bonus||[]).some(b=>b[0]==='Thưởng mở hũ')?`<div class="jar-open"><b>🎉 Hũ đã mở!</b><span>+${vn(r.jarOpened)} xu từ hũ · +50 xu thưởng mở hũ. Từ giờ đến hết ngày, xu cộng thẳng vào tài khoản.</span></div>`:'')+xuSumHtml(lines,delta,r);if(r&&(r.bonus||[]).some(b=>b[0]==='Thưởng mở hũ'))toast(r.jarOpened+50,'🎉 Hũ đã mở','badge')});
 }
 function renderEssays(){
   const el=document.getElementById('essays');if(!el)return;
