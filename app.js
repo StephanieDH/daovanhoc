@@ -139,7 +139,7 @@ function goalsHtml(L){
 }
 function rulesHtml(cls){
   const R=[['up','+10','Đúng ngay lần đầu'],['gr','1 lần','Mỗi câu chỉ trả lời 1 lần'],['dn','−2','Mỗi lần sai'],['gr','0','Câu đã làm đúng rồi'],['fl','+50','Đúng liền 5 câu'],['fl','+100','Đúng liền 10 câu'],['up','+10','Mỗi sao mới của trò'],['up','+15','Chơi mỗi ngày']];
-  return `<div class="rules${cls?' '+cls:''}"><p class="rt">${COIN}Cách kiếm xu đổi quà</p><div class="rg">${R.map(([c,n,l])=>`<div class="rr ${c}"><b>${n}</b><span>${l}</span></div>`).join('')}</div><div class="rmul"><p>Hệ số xu theo đảo (nhân với số ở trên)</p><span class="isl-tag c4">Viết đoạn ×2</span><span class="isl-tag c0">Mở rộng câu ×1</span><span class="isl-tag c1">Câu ghép, Tu từ, Từ ngữ ×½</span></div><p class="rjar">🔒 <b>Hũ xu mỗi ngày:</b> xu kiếm được trong ngày vào hũ; viết 1 đoạn văn ở Phòng thi thử để mở hũ (+50 xu). Hũ chưa mở giữ được 2 ngày, sau đó còn 50%.</p><p class="rgi">Mức Nâng cao: xu thưởng gấp đôi, sai trừ 4 xu. Đủ xu thì đổi quà ngay hoặc để dành. Đổi quà sẽ trừ xu.</p></div>`;
+  return `<div class="rules${cls?' '+cls:''}"><p class="rt">${COIN}Cách kiếm xu đổi quà</p><div class="rg">${R.map(([c,n,l])=>`<div class="rr ${c}"><b>${n}</b><span>${l}</span></div>`).join('')}</div><div class="rmul"><p>Hệ số xu theo đảo (nhân với số ở trên)</p><span class="isl-tag c4">Viết đoạn ×2</span><span class="isl-tag c0">Mở rộng câu ×1</span><span class="isl-tag c1">Câu ghép, Tu từ, Từ ngữ ×½</span></div><p class="rai">🤖 <b>Cô Chấm AI</b> (Phòng thi thử): 9–10 điểm +30, 7–8,9 điểm +15, 5–6,9 điểm +5, nhân hệ số đảo Viết đoạn; mỗi đề tính lần điểm cao nhất.</p><p class="rjar">🔒 <b>Hũ xu mỗi ngày:</b> xu kiếm được trong ngày vào hũ; viết 1 đoạn văn ở Phòng thi thử để mở hũ (+50 xu). Hũ chưa mở giữ được 2 ngày, sau đó còn 50%.</p><p class="rgi">Mức Nâng cao: xu thưởng gấp đôi, sai trừ 4 xu. Đủ xu thì đổi quà ngay hoặc để dành. Đổi quà sẽ trừ xu.</p></div>`;
 }
 function acct(){
   if(isStudent()){const L=badgeList(xu,essays);
@@ -511,16 +511,17 @@ function checks(a){const D=G.de;return [
   ...D.needs.map(k=>({ok:a.c[k]>0,t:`${NEED[k].n}: ${a.c[k]}`,h:NEED[k].h}))]}
 BUILD['thi-thu']=()=>{
   const all=qrows('thi-thu');
-  G.newDe=()=>{const sub=new Set((essays||[]).map(e=>e.de)),fresh=all.filter(r=>!sub.has(r[0])),pool=fresh.length?fresh:all;const [de,min,max,needs]=pool[Math.floor(Math.random()*pool.length)];G.de={de,min:+min,max:+max,needs:needs.split(',').filter(k=>NEED[k])};G.text=''};
+  G.newDe=()=>{const sub=new Set((essays||[]).map(e=>e.de)),fresh=all.filter(r=>!sub.has(r[0])),pool=fresh.length?fresh:all;const [de,min,max,needs]=pool[Math.floor(Math.random()*pool.length)];G.de={de,min:+min,max:+max,needs:needs.split(',').filter(k=>NEED[k])};G.text='';G.hintOpen=false;G.usedHint=false};
   G.newDe();
   G.view=()=>{
     const D=G.de;
     $app.innerHTML=bar(G.g)+`<div class="board">
       <div class="de"><span class="lbl">Đề bài</span><p>${D.de}</p><p class="req">Đoạn văn từ ${D.min} đến ${D.max} câu, có dùng ít nhất: ${D.needs.map(k=>NEED[k].n.toLowerCase()).join('; ')}.</p></div>
+      ${GOIY[D.de]?`<div class="hb"><button class="hint-btn${G.hintOpen?' on':''}" data-act="hint" aria-expanded="${G.hintOpen}">💡 ${G.hintOpen?'Ẩn gợi ý dàn bài':'Gợi ý dàn bài'}</button></div>${G.hintOpen?hintHtml(D):''}`:''}
       <label class="ask" for="essay">Bài làm của bé:</label>
       <textarea id="essay" spellcheck="false" placeholder="Bắt đầu viết đoạn văn ở đây…">${esc(G.text)}</textarea>
       <div class="actions"><button class="primary" data-act="submit">Nộp bài</button><button class="ghost" data-act="newde">Đổi đề khác</button></div>
-      <div id="result"></div>
+      <div id="result"></div><div id="aibox"></div>
       <div class="split">
         <div class="panel"><h3>Bảng kiểm tra</h3><ul class="checks" id="checks"></ul></div>
         <div class="panel"><h3>Bài của bé, đã tô màu</h3><div class="preview" id="preview"></div>
@@ -532,6 +533,41 @@ BUILD['thi-thu']=()=>{
     updateThi();renderEssays();
   };
 };
+// gợi ý dàn bài: câu hỏi dẫn ý (không có bài mẫu); nhãn yêu cầu chỉ hiện khi đề cần; Nâng cao không hiện từ ngữ gợi ý
+function hintHtml(D){
+  const g=GOIY[D.de],[mo,ket]=GOIY_MAU[g[0]],nc=G.g.id.endsWith('-nc'),NL={tn:'trạng ngữ',gh:'kết từ',ss:'so sánh',lk:'từ nối'};
+  const q=t=>{const used=[];const txt=t.replace(/\{s\}/g,g[1]).replace(/\s*\[(tn|gh|ss|lk)\]/g,(m,k)=>{if(D.needs.includes(k))used.push(k);return ''});return `<li>${esc(txt)}${used.map(k=>`<span class="need n-${k}">${NL[k]}</span>`).join('')}</li>`};
+  const a=Math.max(1,D.min-2),b=Math.max(a,D.max-2);
+  return `<div class="hint"><p class="ht">💡 Dàn bài gợi ý</p>
+    <div class="hstep"><span class="htag t1">Mở đoạn<br>1 câu</span><ul>${q(mo)}</ul></div>
+    <div class="hstep"><span class="htag t2">Thân đoạn<br>${a===b?a:a+'–'+b} câu</span><ul>${g[2].map(q).join('')}</ul></div>
+    <div class="hstep"><span class="htag t3">Kết đoạn<br>1 câu</span><ul>${q(ket)}</ul></div>
+    ${nc?'':`<div class="hwords"><b>Từ ngữ có thể dùng:</b> ${g[3].map(w=>`<span class="hchip">${esc(w)}</span>`).join('')}</div>`}
+    <p class="fine">Gợi ý chỉ là câu hỏi dẫn ý, không có bài mẫu để chép. Em tự trả lời bằng câu văn của mình nhé.</p></div>`;
+}
+// Cô Chấm AI: chấm nội dung sau khi bài đã lưu
+function aiHtml(ai,gain,note){
+  const v=n=>String(n).replace('.',','),row=(t,n,m)=>`<span>${t}<span class="aibar"><i style="width:${Math.round(n/m*100)}%"></i></span></span><b>${v(n)}/${m}</b>`;
+  const lv=ai.score>=9?'Giỏi':ai.score>=7?'Khá':ai.score>=5?'Đạt':'Cần cố gắng';
+  return `<div class="aibox"><div class="aihd"><span class="ailbl">🤖 Cô Chấm AI nhận xét</span><span class="aipill">${lv}${gain?' · +'+gain+' xu':''}</span></div>
+    <div class="aiscore">${v(ai.score)} <small>/ 10 điểm nội dung</small></div>
+    <div class="aicrit">${row('Đúng đề, đủ ý',ai.dung_de,3)}${row('Câu văn, từ ngữ gợi tả',ai.cau_van,3)}${row('Liên kết, trình tự',ai.lien_ket,2)}${row('Chính tả, dấu câu',ai.chinh_ta,2)}</div>
+    ${ai.tong?`<p class="aitong">${esc(ai.tong)}</p>`:''}
+    <div class="aitwo"><div class="aiok"><b>👍 Em làm tốt</b><ul>${ai.tot.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>
+    <div class="aifix"><b>✏️ Em sửa thêm</b><ul>${ai.sua.map(t=>`<li>${esc(t)}</li>`).join('')||'<li>Bài viết tốt rồi!</li>'}</ul></div></div>
+    ${ai.loi.length?`<div class="ailoi"><b>Chính tả:</b> ${ai.loi.map(l=>`<span><s>${esc(l.sai)}</s> → ${esc(l.dung)}</span>`).join(' · ')}</div>`:''}
+    <p class="fine">${note?note+' ':''}Cô Chấm AI chỉ gợi ý chỗ sửa, không viết lại bài thay em. Điểm do AI chấm có thể chưa chính xác, bố mẹ hoặc thầy cô có thể xem lại.</p></div>`;
+}
+async function aiGradeThi(de,text){
+  const el=()=>document.getElementById('aibox');if(!el())return;
+  el().innerHTML='<div class="aibox aiwait">🤖 Cô Chấm AI đang đọc bài của em…</div>';
+  const D=G.de,yc=`Từ ${D.min} đến ${D.max} câu; dùng: ${D.needs.map(k=>NEED[k].n.toLowerCase()).join(', ')}`;
+  try{const d=await call('grade',{game:G.g.id,de,text,yc});if(d.xu){xu=d.xu;renderTotal()}
+    if(d.gain)toast(d.gain,'Cô Chấm AI: '+String(d.ai.score).replace('.',',')+' điểm');
+    if(el())el().innerHTML=aiHtml(d.ai,d.gain,d.again?'Bài này cô đã chấm rồi, đây là kết quả lần trước.':d.left!=null?`Đề này em còn ${d.left} lần nhờ cô chấm.`:'');
+    const i=(essays||[]).findIndex(e=>e.de===de&&e.text===text);if(i>=0){essays[i]={...essays[i],ai:d.ai};renderEssays()}
+  }catch(e){if(el())el().innerHTML=`<div class="aibox aiwait">🤖 ${esc(e.message)}</div>`}
+}
 function updateThi(){
   const a=analyze(G.text);
   document.getElementById('checks').innerHTML=checks(a).map(c=>`<li class="${c.ok?'yes':'no'}"><span class="ic">${c.ok?'✓':'!'}</span><span>${c.t}${!c.ok&&c.h?`<small>${c.h}</small>`:''}</span></li>`).join('');
@@ -551,12 +587,13 @@ function submitThi(){
     if(!first&&!gain)toast(0,'Bài chưa tăng sao so với lần trước · không cộng xu')}
   const lines=groupLines(G.xuLines),delta=G.xu;G.xuLines=[];
   document.getElementById('result').innerHTML=`<div class="msg ${st===3?'ok':'weak'}"><b>${stars(st)}</b><span>${st===3?'Bài làm đạt đủ yêu cầu của đề. Giỏi lắm!':`Bài làm đạt ${met}/${n} yêu cầu. Xem bảng kiểm tra để sửa và nộp lại nhé.`}${isStudent()?' Bài đã được lưu, thầy cô sẽ đọc và nhận xét.':isStaff()?' (Chơi thử: bài không được lưu.)':''}</span></div>${isStaff()?'':`<div class="xu-sum" id="xusum">${xuSumHtml(lines,delta,null)}</div>`}`;
-  saveRound(G.g.id,st,isStudent()?{de:G.de.de,text:G.text}:undefined).then(r=>{const el=document.getElementById('xusum');if(el)el.innerHTML=(r&&r.jarOpened!=null&&(r.bonus||[]).some(b=>b[0]==='Thưởng mở hũ')?`<div class="jar-open"><b>🎉 Hũ đã mở!</b><span>+${vn(r.jarOpened)} xu từ hũ · +50 xu thưởng mở hũ. Từ giờ đến hết ngày, xu cộng thẳng vào tài khoản.</span></div>`:'')+xuSumHtml(lines,delta,r);if(r&&(r.bonus||[]).some(b=>b[0]==='Thưởng mở hũ'))toast(r.jarOpened+50,'🎉 Hũ đã mở','badge')});
+  const sDe=G.de.de,sText=G.text;if(document.getElementById('aibox'))document.getElementById('aibox').innerHTML='';
+  saveRound(G.g.id,st,isStudent()?{de:sDe,text:sText,hint:!!G.usedHint}:undefined).then(r=>{if(isStudent()&&r)aiGradeThi(sDe,sText);const el=document.getElementById('xusum');if(el)el.innerHTML=(r&&r.jarOpened!=null&&(r.bonus||[]).some(b=>b[0]==='Thưởng mở hũ')?`<div class="jar-open"><b>🎉 Hũ đã mở!</b><span>+${vn(r.jarOpened)} xu từ hũ · +50 xu thưởng mở hũ. Từ giờ đến hết ngày, xu cộng thẳng vào tài khoản.</span></div>`:'')+xuSumHtml(lines,delta,r);if(r&&(r.bonus||[]).some(b=>b[0]==='Thưởng mở hũ'))toast(r.jarOpened+50,'🎉 Hũ đã mở','badge')});
 }
 function renderEssays(){
   const el=document.getElementById('essays');if(!el)return;
   if(!isStudent()){el.innerHTML='';return}
-  el.innerHTML=essays.length?`<div class="panel"><h3>Bài đã nộp (${essays.length})</h3>${essays.map(e=>`<details class="essay"${e.comment?' open':''}><summary>${stars(e.stars||0)} <span>${esc(new Date(e.at).toLocaleDateString('vi-VN'))} · ${esc(e.de)}</span>${e.comment?'<span class="badge soft">có nhận xét</span>':''}</summary><p>${esc(e.text)}</p>${e.comment?`<div class="msg info"><b>${esc(e.commentBy||'Thầy cô')}:</b><span>${esc(e.comment)}</span></div>`:''}</details>`).join('')}</div>`:'';
+  el.innerHTML=essays.length?`<div class="panel"><h3>Bài đã nộp (${essays.length})</h3>${essays.map(e=>`<details class="essay"${e.comment?' open':''}><summary>${stars(e.stars||0)} <span>${esc(new Date(e.at).toLocaleDateString('vi-VN'))} · ${esc(e.de)}</span>${e.ai?`<span class="badge soft">AI ${String(e.ai.score).replace('.',',')}/10</span>`:''}${e.comment?'<span class="badge soft">có nhận xét</span>':''}</summary><p>${esc(e.text)}</p>${e.ai?aiHtml(e.ai,0,''):''}${e.comment?`<div class="msg info"><b>${esc(e.commentBy||'Thầy cô')}:</b><span>${esc(e.comment)}</span></div>`:''}</details>`).join('')}</div>`:'';
 }
 
 /* ---------- Phân loại từ ---------- */
@@ -756,7 +793,7 @@ function essayFeed(S){
   return all.map(({s,e})=>essayCard(s,e,true)).join('');
 }
 function essayCard(s,e,canComment){
-  return `<div class="board ecard"><div class="ehead"><b>${esc(s.name)}</b><span class="fine">${esc(s.code)} · ${fmtDate(e.at)}</span>${stars(e.stars||0)}${e.comment?'':'<span class="badge soft">chờ nhận xét</span>'}</div>
+  return `<div class="board ecard"><div class="ehead"><b>${esc(s.name)}</b><span class="fine">${esc(s.code)} · ${fmtDate(e.at)}</span>${stars(e.stars||0)}${e.ai?`<span class="badge soft">AI ${String(e.ai.score).replace('.',',')}/10</span>`:''}${e.hint?'<span class="badge soft">có xem gợi ý</span>':''}${e.comment?'':'<span class="badge soft">chờ nhận xét</span>'}</div>
     <p class="de-t">${esc(e.de)}</p><p class="etext">${esc(e.text)}</p>
     ${canComment?`<form class="cform" data-form="comment" data-code="${esc(s.code)}" data-at="${esc(e.at)}"><textarea rows="2" aria-label="Nhận xét" placeholder="Nhận xét cho bài viết, ví dụ: Bài có hình ảnh so sánh đẹp, cần thêm câu kết nêu cảm xúc.">${esc(e.comment)}</textarea>
       <div class="actions"><button class="primary sm" type="submit">${e.comment?'Sửa nhận xét':'Gửi nhận xét'}</button>${me&&me.role==='admin'?`<button class="ghost sm" type="button" data-act="d-delessay" data-code="${esc(s.code)}" data-at="${esc(e.at)}">Xóa bài</button>`:''}<span class="fine saved" role="status"></span></div></form>`
@@ -932,6 +969,7 @@ document.addEventListener('click',e=>{
   else if(a==='again'){startGame(G.g);window.scrollTo(0,0)}
   else if(a==='submit')submitThi();
   else if(a==='newde'){G.newDe();render()}
+  else if(a==='hint'){G.hintOpen=!G.hintOpen;if(G.hintOpen)G.usedHint=true;const t=G.text;render();const ta=document.getElementById('essay');if(ta&&ta.value!==t){ta.value=t}}
 });
 document.addEventListener('keydown',e=>{if(e.key==='Enter'){const r=e.target.closest&&e.target.closest('tr[data-act="d-open"]');if(r)dashAct('d-open',r)}});
 document.addEventListener('submit',async e=>{
