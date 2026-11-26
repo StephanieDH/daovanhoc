@@ -53,8 +53,8 @@ button,a.btn{font:inherit;cursor:pointer}
 :focus-visible{outline:3px solid var(--tim);outline-offset:2px;border-radius:8px}
 
 .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
-.brand-mark{width:40px;height:40px;border-radius:12px;background:var(--tim);color:var(--on-tim);display:grid;place-items:center;font-family:var(--font-display);font-weight:700;font-size:20px}
+.brand{display:flex;align-items:center;gap:6px;text-decoration:none;color:var(--ink)}
+.brand-mark{width:40px;height:40px;flex:0 0 40px;border-radius:12px;display:block;object-fit:cover}
 .brand-name{font-family:var(--font-display);font-weight:700;font-size:1.45rem}
 .brand-sub{font-size:.8rem;color:var(--muted);line-height:1.2}
 .total{display:flex;align-items:center;gap:8px;font-weight:700;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-variant-numeric:tabular-nums}
@@ -385,7 +385,7 @@ mark.m-lk{background:var(--manner-bg);color:var(--manner)}
 <div class="wrap">
   <header class="top">
     <a class="brand" href="#">
-      <span class="brand-mark" aria-hidden="true">Đ</span>
+      <img class="brand-mark" src="icons/icon-192.png" width="40" height="40" alt="" aria-hidden="true">
       <span><span class="brand-name">Đảo Câu Văn</span><br><span class="brand-sub">Luyện mở rộng câu · lớp 4–5 ôn thi vào lớp 6</span></span>
     </a>
     <div class="total" id="total"></div>
