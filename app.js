@@ -252,10 +252,37 @@ function renderEnd(){
 const opt=(label,ok,why)=>({label,ok,why});
 const pt=o=>`<span class="pt ${o.ok===true?'good':o.ok==='weak'?'weak':'bad'}">${o.label}</span>`;
 const BLANK='<span class="blank">?</span>';
-function resetQuiz(){G.sel=null;G.tried=[];G.done=false;G.msg=null}
+function resetQuiz(){G.sel=null;G.tried=[];G.done=false;G.msg=null;G.tlText='';G.tlRes=null;G.tlWait=false;G.tlErr=''}
 function quiz(id,map){G.qs=pickNew(qrows(id).map((r,ix)=>[r,ix]),QUIZ_N,x=>x[1]).map(([r,ix])=>Object.assign(map(r),{key:ix}));resetQuiz()}
+// câu tự luận ngắn mức Thử thách (bảng <trò>-tt-tl): thay câu cuối của lượt, ưu tiên câu chưa làm
+function addTL(id){
+  const T=LV==='-tt'?bank(id+'-tt-tl'):[];if(!T.length||!G.qs.length)return;
+  const lk='dcv-tl-'+(me&&me.code||'guest')+'-'+id,done=new Set(LS.get(lk,[])||[]),fresh=T.map((r,ix)=>ix).filter(ix=>!done.has(ix)),pool=fresh.length?fresh:T.map((r,ix)=>ix),ix=pool[Math.floor(Math.random()*pool.length)];
+  const [p,src,q,rub,ref]=T[ix].split('|');G.qs=G.qs.slice(0,QUIZ_N-1);G.qs.push({tl:{p,src,q,rub,ref,ix,lk}});
+}
+function renderTL(q){
+  const T=q.tl,R=G.tlRes;
+  const yh=R?R.y.map((y,i)=>`<div class="tly ${y.diem>=1?'ok':y.diem>0?'half':'no'}"><b>${y.diem>=1?'✓':y.diem>0?'½':'✗'}</b><span><i>${esc(T.rub.split('~')[i]||'')}</i><br>${esc(y.nhan_xet)}</span></div>`).join(''):'';
+  $app.innerHTML=bar(G.g,`Câu ${G.i+1}/${G.qs.length}`)+`<div class="board"><p class="ask"><span class="tltag">Tự luận ngắn</span> Đọc kĩ rồi viết câu trả lời của em.</p>
+    <div class="sentence"><div class="poem">${esc(T.p).split('/').map(x=>x.trim()).join('<br>')}${T.src&&T.src!=='Câu mẫu'?`<div class="by">${esc(T.src)}</div>`:''}<div class="q">${esc(T.q)}</div></div></div>
+    ${R?`<div class="tlans"><b>Bài của em:</b> ${esc(G.tlText)}</div><div class="tlres"><div class="tlsc">${String(R.score).replace('.',',')} / 3 ý</div>${yh}${R.tong?`<p class="aitong">${esc(R.tong)}</p>`:''}<div class="tlref"><b>Gợi ý câu trả lời đủ ý:</b> ${esc(T.ref)}</div></div>${nextBtn(G.i+1>=G.qs.length,'Câu tiếp theo')}`
+    :`<textarea id="tltext" rows="4" placeholder="Em viết 2–3 câu trả lời ở đây…" ${G.tlWait?'disabled':''}>${esc(G.tlText||'')}</textarea>
+    <div class="actions"><button class="primary" data-act="tlsend" ${G.tlWait?'disabled':''}>${G.tlWait?'Cô Chấm AI đang đọc…':'Nộp câu trả lời'}</button></div>${G.tlErr?`<div class="msg weak"><span>${esc(G.tlErr)}</span></div>`:''}
+    <p class="fine">Mỗi câu chỉ nộp một lần. Cô Chấm AI chấm theo 3 ý: gọi đúng biện pháp, chỉ ra cái hay, nêu cảm xúc hoặc ý nghĩa.</p>`}</div>`;
+  const ta=document.getElementById('tltext');if(ta)ta.addEventListener('input',()=>{G.tlText=ta.value});
+}
+async function sendTL(){
+  const q=G.qs[G.i];if(!q||!q.tl||G.tlWait||G.tlRes)return;const T=q.tl,text=(G.tlText||'').trim();
+  if(text.length<15){G.tlErr='Em viết thêm rồi hãy nộp nhé.';return render()}
+  G.tlWait=true;G.tlErr='';render();
+  try{const d=await call('tlgrade',{game:G.g.id,p:T.p,q:T.q,rub:T.rub,text});G.tlRes=d;G.done=true;if(d.score>=2)G.correct++;
+    const done=new Set(LS.get(T.lk,[])||[]);done.add(T.ix);LS.set(T.lk,[...done])}
+  catch(e){G.tlErr=e.message}
+  G.tlWait=false;render();
+}
 function renderQuiz(){
   if(G.i>=G.qs.length)return renderEnd();
+  if(G.qs[G.i].tl)return renderTL(G.qs[G.i]);
   const q=G.qs[G.i],sel=G.sel!=null?q.options[G.sel]:null;
   const opts=q.options.map((o,j)=>{let c='';if(G.done&&G.sel===j)c='on';else if(G.tried.includes(j))c=o.ok==='weak'?'weak':'bad';
     return `<button class="opt ${c}${G.shake===j?' shake':''}" data-act="pick" data-j="${j}" ${G.done||G.tried.includes(j)?'disabled':''}>${o.label}</button>`}).join('');
@@ -409,9 +436,10 @@ BUILD['nhan-hoa']=()=>quiz('nhan-hoa',([base,nh,words,ss,plain])=>({intro:`<p cl
   view:o=>o?pt(o):BLANK}));
 
 /* ---------- Kính lúp cảm thụ ---------- */
-BUILD['cam-thu']=()=>quiz('cam-thu',([lines,by,q,r,wr,w1,y1,w2,y2])=>({intro:'<p class="ask">Đọc kĩ rồi chọn câu trả lời đúng nhất.</p>',col:true,
+BUILD['cam-thu']=()=>{quiz('cam-thu',([lines,by,q,r,wr,w1,y1,w2,y2])=>({intro:'<p class="ask">Đọc kĩ rồi chọn câu trả lời đúng nhất.</p>',col:true,
   options:shuffle([opt(r,true,wr),opt(w1,false,y1),opt(w2,false,y2)]),
   view:()=>`<div class="poem">${lines.split('/').map(s=>s.trim()).join('<br>')}${by?`<div class="by">${by}</div>`:''}<div class="q">${q}</div></div>`}));
+  addTL('cam-thu');};
 
 /* ---------- Nối đôi bạn thân ---------- */
 BUILD['noi-doi']=()=>{
@@ -1058,6 +1086,7 @@ document.addEventListener('click',e=>{
   else if(a==='next')next();
   else if(a==='again'){startGame(G.g);window.scrollTo(0,0)}
   else if(a==='submit')submitThi();
+  else if(a==='tlsend')sendTL();
   else if(a==='newde'){G.newDe();render()}
   else if(a==='hint'){G.hintOpen=!G.hintOpen;if(G.hintOpen)G.usedHint=true;const t=G.text;render();const ta=document.getElementById('essay');if(ta&&ta.value!==t){ta.value=t}}
 });
