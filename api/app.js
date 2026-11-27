@@ -14,8 +14,10 @@ const LOCAL = process.env.DCV_LOCAL === '1';
 const T = 'dcv_progress';
 const DAY = 86400000;
 const GAME_BASE = ['cay-cau','tau-chu','tham-tu','ghep-cau','cau-noi','sua-cau','so-sanh','nhan-hoa','cam-thu','noi-doi','kinh-lup','tu-lay','thanh-ngu','xep-doan','thi-thu','dau-cau','phan-loai','nhieu-nghia','cap-tu','chinh-ta','doc-hieu'];
-const GAME_IDS = [...GAME_BASE, ...GAME_BASE.map(g => g + '-nc')];
-const isThi = g => g === 'thi-thu' || g === 'thi-thu-nc';
+// Thử thách (Thách đấu): id <trò>-tt, ngân hàng data/tt-*.js; chưa có câu thì BANK_ROWS = 0 nên mọi phần Thử thách tự ẩn
+const GAME_IDS = [...GAME_BASE, ...GAME_BASE.map(g => g + '-nc'), ...GAME_BASE.map(g => g + '-tt')];
+const isThi = g => g === 'thi-thu' || g === 'thi-thu-nc' || g === 'thi-thu-tt';
+const lvMul = g => String(g).endsWith('-tt') ? 3 : String(g).endsWith('-nc') ? 2 : 1;
 
 class Bad extends Error { constructor(msg, status = 400) { super(msg); this.status = status; } }
 const bad = (m, s) => { throw new Bad(m, s); };
@@ -66,7 +68,7 @@ async function who(req) {
 const need = (me, roles) => { if (!me) bad('Hãy đăng nhập lại.', 401); if (!roles.includes(me.role)) bad('Tài khoản này không có quyền làm việc đó.', 403); return me; };
 
 // ---------- dữ liệu gửi về trình duyệt
-const essaysOut = es => (Array.isArray(es) ? es : []).map(e => ({ at: e.at, de: e.de, text: e.text, stars: e.stars, nc: !!e.nc, comment: e.comment || '', commentBy: e.commentBy || '', commentAt: e.commentAt || null, hint: !!e.hint, ai: e.ai || null }));
+const essaysOut = es => (Array.isArray(es) ? es : []).map(e => ({ at: e.at, de: e.de, text: e.text, stars: e.stars, nc: !!e.nc, tt: !!e.tt, comment: e.comment || '', commentBy: e.commentBy || '', commentAt: e.commentAt || null, hint: !!e.hint, ai: e.ai || null }));
 // ---------- xu và quà
 const DEFAULT_GIFTS = [
   { m: 1000, name: "1 bộ sticker" }, { m: 2000, name: "30 phút chơi game" },
@@ -80,10 +82,10 @@ function bestRun(days) { const s = [...new Set(days || [])].sort(); let best = 0
 const GOAL_FAV = ['xep-doan', 'doc-hieu', 'thi-thu', 'cam-thu'];
 function goalPick(p, exclude) {
   const x = p.xu || {}, sv = x.solved || {}, E = Array.isArray(p.essays) ? p.essays : [];
-  const thi = nc => new Set(E.filter(e => !!e.nc === nc).map(e => e.de)).size / 50;
+  const thi = lv => new Set(E.filter(e => (e.tt ? 'tt' : e.nc ? 'nc' : '') === lv).map(e => e.de)).size / 50;
   const ids = GAME_IDS.filter(g => (isThi(g) || BANK_ROWS[g] > 0) && g !== exclude);
-  const r = ids.map(g => [g, isThi(g) ? thi(g.endsWith('-nc')) : (sv[g] || []).length / BANK_ROWS[g]]).filter(a => a[1] < 1)
-    .map(([g, v]) => [g, v - (GOAL_FAV.includes(g.replace(/-nc$/, '')) ? 0.3 : 0)]);
+  const r = ids.map(g => [g, isThi(g) ? thi(g.endsWith('-nc') ? 'nc' : g.endsWith('-tt') ? 'tt' : '') : (sv[g] || []).length / BANK_ROWS[g]]).filter(a => a[1] < 1)
+    .map(([g, v]) => [g, v - (GOAL_FAV.includes(g.replace(/-(nc|tt)$/, '')) ? 0.3 : 0)]);
   const pool = (r.length ? r : ids.map(g => [g, 0])).sort((a, b) => a[1] - b[1]).slice(0, 5);
   return pool[Math.floor(Math.random() * pool.length)][0];
 }
@@ -102,12 +104,15 @@ const goalLeft = x => 3 - (x.gdone && x.gdone.day === vnDay() ? x.gdone.n : 0);
 const xuOut = x => { x = x || {}; return { total: x.total || 0, jar: jarValue(x), wrote: wroteToday(x), goal: x.goal || null, goalLeft: goalLeft(x), peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()),
   stats: { solved: x.solved || {}, tried: x.tried || {}, maxStreak: x.maxStreak || 0, perfect: x.perfect || 0, bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
 // Thưởng xu khi mở khóa huy hiệu (mỗi huy hiệu một lần). Danh sách huy hiệu do trình duyệt tính; máy chủ giữ mức thưởng.
-const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 200, write2s: 300, write3s: 400, writeN5: 600, writeN10: 800, writeN20: 1200, king: 1000, legend: 2000 };
+const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 200, write2s: 300, write3s: 400, writeN5: 600, writeN10: 800, writeN20: 1200, king: 1000, legend: 2000, god: 3000, writeL10: 1500, writeL20: 2000, writeL35: 3000 };
 // hệ số xu theo đảo: 0 Mở rộng câu ×1; 1 Câu ghép, 2 Tu từ, 3 Từ ngữ ×½; 4 Viết đoạn (gồm thi thử) ×2
 const ISL_MUL = [1, 0.5, 0.5, 0.5, 2];
-const gameIsl = g => { g = String(g).replace(/-nc$/, ''); if (g === 'thi-thu') return 4; const k = ISL_GAMES.findIndex(a => a.includes(g)); return k < 0 ? 0 : k; };
+const gameIsl = g => { g = String(g).replace(/-(nc|tt)$/, ''); if (g === 'thi-thu') return 4; const k = ISL_GAMES.findIndex(a => a.includes(g)); return k < 0 ? 0 : k; };
 function badgeReward(id) {
-  let m = /^([a-z-]+)-nc-(dong|bac|vang)$/.exec(id);
+  let m = /^([a-z-]+)-tt-(dong|bac|vang)$/.exec(id);
+  if (m && GAME_BASE.includes(m[1]) && m[1] !== "thi-thu") return { dong: 350, bac: 400, vang: 450 }[m[2]] * ISL_MUL[gameIsl(m[1])];
+  m = /^lisl([0-4])-([123])$/.exec(id); if (m) return ({ 1: 700, 3: 800, 2: 900 })[m[2]] * ISL_MUL[+m[1]];
+  m = /^([a-z-]+)-nc-(dong|bac|vang)$/.exec(id);
   if (m && GAME_BASE.includes(m[1]) && m[1] !== "thi-thu") return { dong: 200, bac: 250, vang: 300 }[m[2]] * ISL_MUL[gameIsl(m[1])];
   m = /^([a-z-]+)-(dong|bac|vang)$/.exec(id);
   if (m && GAME_IDS.includes(m[1]) && m[1] !== "thi-thu") return { dong: 50, bac: 100, vang: 150 }[m[2]] * ISL_MUL[gameIsl(m[1])];
@@ -121,7 +126,9 @@ const BANK_ROWS = { "cay-cau": 50, "tau-chu": 50, "tham-tu": 50, "dau-cau": 51, 
   "noi-doi": 13, "kinh-lup": 50, "tu-lay": 53, "thanh-ngu": 51, "phan-loai": 50, "nhieu-nghia": 52, "cap-tu": 57, "chinh-ta": 55, "xep-doan": 50, "doc-hieu": 50 };
 // Số dòng ngân hàng mức Nâng cao (data/nc-*.js) — chạy lại script khi thêm câu
 const BANK_ROWS_NC = {"cam-thu-nc":104,"cap-tu-nc":101,"cau-noi-nc":100,"cay-cau-nc":105,"chinh-ta-nc":101,"dau-cau-nc":100,"doc-hieu-nc":35,"ghep-cau-nc":101,"kinh-lup-nc":104,"nhan-hoa-nc":100,"nhieu-nghia-nc":100,"noi-doi-nc":25,"phan-loai-nc":104,"so-sanh-nc":102,"sua-cau-nc":100,"tau-chu-nc":101,"tham-tu-nc":100,"thanh-ngu-nc":104,"thi-thu-nc":50,"tu-lay-nc":114,"xep-doan-nc":100};
-Object.assign(BANK_ROWS, BANK_ROWS_NC);
+// Số dòng ngân hàng Thử thách (data/tt-*.js) — chạy lại script khi thêm câu
+const BANK_ROWS_TT = {};
+Object.assign(BANK_ROWS, BANK_ROWS_NC, BANK_ROWS_TT);
 const ISL_GAMES = [["cay-cau", "tau-chu", "tham-tu", "dau-cau"], ["ghep-cau", "cau-noi", "sua-cau"], ["so-sanh", "nhan-hoa", "cam-thu"],
   ["noi-doi", "kinh-lup", "tu-lay", "thanh-ngu", "phan-loai", "nhieu-nghia", "cap-tu", "chinh-ta"], ["xep-doan", "doc-hieu"]];
 // Máy chủ tự kiểm tra điều kiện của huy hiệu trước khi thưởng xu
@@ -132,6 +139,7 @@ function earned(id, p) {
   let m = /^([a-z-]+)-(dong|bac|vang)$/.exec(id); if (m) return tierOk(m[1], m[2]);
   m = /^isl([0-4])-([123])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g, ({ 1: "dong", 3: "bac", 2: "vang" })[m[2]]));
   m = /^nisl([0-4])-([123])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g + "-nc", ({ 1: "dong", 3: "bac", 2: "vang" })[m[2]]));
+  m = /^lisl([0-4])-([123])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g + "-tt", ({ 1: "dong", 3: "bac", 2: "vang" })[m[2]]));
   switch (id) {
     case "streak10": return (x.maxStreak || 0) >= 10; case "streak20": return (x.maxStreak || 0) >= 20; case "streak30": return (x.maxStreak || 0) >= 30;
     case "perfect5": return (x.perfect || 0) >= 5; case "days7": return bestRun(x.days) >= 7; case "days30": return bestRun(x.days) >= 30;
@@ -139,6 +147,8 @@ function earned(id, p) {
     case "writeN5": return deN(e => e.nc && e.stars === 3) >= 10; case "writeN10": return deN(e => e.nc && e.stars === 3) >= 20; case "writeN20": return deN(e => e.nc && e.stars === 3) >= 35;
     case "king": return [0, 1, 2, 3, 4].every(k => earned("isl" + k + "-2", p));
     case "legend": return [0, 1, 2, 3, 4].every(k => earned("nisl" + k + "-2", p));
+    case "god": return [0, 1, 2, 3, 4].every(k => earned("lisl" + k + "-2", p));
+    case "writeL10": return deN(e => e.tt && e.stars === 3) >= 10; case "writeL20": return deN(e => e.tt && e.stars === 3) >= 20; case "writeL35": return deN(e => e.tt && e.stars === 3) >= 35;
   }
   return false;
 }
@@ -194,7 +204,7 @@ Chấm theo 4 tiêu chí, mỗi tiêu chí cho điểm theo bước 0,5:
 - cau_van (0–3): câu đúng ngữ pháp, từ ngữ gợi tả, có hình ảnh, cảm xúc chân thật.
 - lien_ket (0–2): các câu nối với nhau mạch lạc, đúng trình tự, có từ ngữ liên kết.
 - chinh_ta (0–2): chính tả, viết hoa, dấu câu.
-Mức "Nâng cao" chấm chặt hơn mức "Cơ bản". Bài lạc đề hoặc chỉ chép lại đề thì dung_de tối đa 1. Bài quá ngắn so với yêu cầu số câu thì trừ ở dung_de.
+Mức "Nâng cao" chấm chặt hơn mức "Cơ bản"; "Thử thách" chấm chặt nhất, như giám khảo thi vào lớp 6 trường chất lượng cao. Bài lạc đề hoặc chỉ chép lại đề thì dung_de tối đa 1. Bài quá ngắn so với yêu cầu số câu thì trừ ở dung_de.
 
 Cách nhận xét:
 - Xưng "cô", gọi học sinh là "em". Lời lẽ ấm áp, khích lệ, ngắn gọn, dễ hiểu với học sinh lớp 5.
@@ -230,7 +240,7 @@ async function aiGrade(de, yc, text, nc) {
     betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',
     output_config: { effort: 'medium', format: { type: 'json_schema', schema: AI_SCHEMA } },
     system: AI_SYS,
-    messages: [{ role: 'user', content: `<muc>${nc ? 'Nâng cao' : 'Cơ bản'}</muc>\n<de>${de}</de>\n<yeu_cau>${yc}</yeu_cau>\n<bai_lam>\n${text}\n</bai_lam>` }]
+    messages: [{ role: 'user', content: `<muc>${nc}</muc>\n<de>${de}</de>\n<yeu_cau>${yc}</yeu_cau>\n<bai_lam>\n${text}\n</bai_lam>` }]
   }); } catch (e) {
     if (/credit balance/i.test(String(e && e.message))) { await aiLog(null, true).catch(() => {}); bad('Cô Chấm AI đang tạm nghỉ (hết tiền chấm AI). Em báo bố mẹ hoặc thầy cô nhé.', 503); }
     bad('Cô Chấm AI đang bận, em thử lại sau ít phút nhé.', 502);
@@ -296,11 +306,11 @@ async function handle(req, res) {
     // xu: phần cộng/trừ trong lượt chơi do trình duyệt gửi lên (giới hạn hợp lí), thưởng thêm do máy chủ tính
     ensureGoal(p);
     const x = { ...(p.xu || {}) }, bonus = [];
-    let delta = Math.max(-500, Math.min(game.endsWith('-nc') ? 3600 : 1800, parseInt(body.xu, 10) || 0));
+    let delta = Math.max(-500, Math.min(1800 * lvMul(game), parseInt(body.xu, 10) || 0));
     // thi thử: mỗi đề được tối đa +20 (lần nộp đầu) + 10 mỗi sao vượt kỷ lục cũ của đề + 30 (lần đầu đạt 3 sao)
     if (isThi(game) && body.essay) {
       const de = String(body.essay.de || '').slice(0, 300), old = (p.essays || []).filter(e => e.de === de), prev = Math.max(0, ...old.map(e => e.stars || 0));
-      const cap = ((old.length ? 0 : 20) + 10 * Math.max(0, stars - prev) + (stars === 3 && prev < 3 ? 30 : 0)) * (game.endsWith('-nc') ? 2 : 1) * ISL_MUL[gameIsl(game)];
+      const cap = ((old.length ? 0 : 20) + 10 * Math.max(0, stars - prev) + (stars === 3 && prev < 3 ? 30 : 0)) * lvMul(game) * ISL_MUL[gameIsl(game)];
       delta = Math.min(delta, cap);
     }
     // gợi ý kiếm thêm xu: lượt chơi đúng trò được gợi ý và có câu mới (thi thử: bài được xu)
@@ -312,7 +322,7 @@ async function handle(req, res) {
         x.goal = { game: goalPick({ ...p, xu: x }, game) };
       }
     }
-    if (stars === 3 && prevStars < 3) bonus.push(["Lần đầu đạt 3 sao ở trò này", Math.floor((game.endsWith('-nc') ? 100 : 50) * ISL_MUL[gameIsl(game)])]);
+    if (stars === 3 && prevStars < 3) bonus.push(["Lần đầu đạt 3 sao ở trò này", Math.floor(50 * lvMul(game) * ISL_MUL[gameIsl(game)])]);
     const today = vnDay(); x.days = Array.isArray(x.days) ? x.days : [];
     if (!x.days.includes(today)) {
       bonus.push(["Chơi hôm nay", 15]); x.days = [...x.days, today].slice(-60);
@@ -340,7 +350,7 @@ async function handle(req, res) {
     p.xu = x; p.bonus = bonus;
     p.essays = Array.isArray(p.essays) ? p.essays : [];
     if (isThi(game) && body.essay && body.essay.text) {
-      p.essays = [{ at: new Date().toISOString(), de: String(body.essay.de || '').slice(0, 300), text: String(body.essay.text).slice(0, 5000), stars, nc: game.endsWith('-nc'), hint: !!body.essay.hint }, ...p.essays].slice(0, 50);
+      p.essays = [{ at: new Date().toISOString(), de: String(body.essay.de || '').slice(0, 300), text: String(body.essay.text).slice(0, 5000), stars, nc: game.endsWith('-nc'), tt: game.endsWith('-tt'), hint: !!body.essay.hint }, ...p.essays].slice(0, 50);
     }
     await progPut(p);
     return out({ ...report({ code: me.code, name: me.name, active: true }, p, false), bonus: p.bonus, jarOpened: p.jarOpened || 0, inJar: !wroteToday(p.xu || {}) && !isThi(game) });
@@ -358,7 +368,7 @@ async function handle(req, res) {
     if (day.n >= 10) bad('Hôm nay em đã nhờ Cô Chấm AI 10 lần rồi. Mai cô chấm tiếp nhé.', 429);
     const tries = (x.aiTry || {})[de] || 0;
     if (tries >= 3) bad('Đề này Cô Chấm AI đã chấm 3 lần. Em thử một đề khác nhé.', 429);
-    const ai = await aiGrade(de, yc, text, game.endsWith('-nc'));
+    const ai = await aiGrade(de, yc, text, game.endsWith('-tt') ? 'Thử thách' : game.endsWith('-nc') ? 'Nâng cao' : 'Cơ bản');
     const prev = (x.aiBest || {})[de] || 0;
     const gain = Math.floor(Math.max(0, AI_TIER(ai.score) - AI_TIER(prev)) * (game.endsWith('-nc') ? 2 : 1) * ISL_MUL[gameIsl(game)]);
     x.aiBest = { ...(x.aiBest || {}), [de]: Math.max(prev, ai.score) };

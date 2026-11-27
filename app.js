@@ -55,8 +55,11 @@ const unit=id=>(id=baseId(id))==='noi-doi'?'cặp':id==='thi-thu'?'đề':id==='
 const rows=id=>bank(id).map(s=>s.split('|'));
 // mức Nâng cao: ngân hàng BANK['<trò>-nc'], dùng chung cách chơi với trò gốc
 let LV='';const qbank=id=>bank(id+LV),qrows=id=>qbank(id).map(s=>s.split('|'));
-const baseId=id=>String(id).replace(/-nc$/,'');
+const baseId=id=>String(id).replace(/-(nc|tt)$/,'');
 const NCG=()=>GAMES.filter(g=>bank(g.id+'-nc').length).map(g=>({...g,id:g.id+'-nc',base:g.id,nc:true}));
+// Thử thách (Thách đấu): chỉ hiện khi đã có câu trong data/tt-*.js
+const L3G=()=>GAMES.filter(g=>bank(g.id+'-tt').length).map(g=>({...g,id:g.id+'-tt',base:g.id,l3:true}));
+const lvMul=g=>g&&g.l3?3:g&&g.nc?2:1;
 const STAR='<path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z"/>';
 function stars(n,big){let h=`<span class="stars${big?' big':''}" role="img" aria-label="${n} trên 3 sao">`;for(let i=0;i<3;i++)h+=`<svg viewBox="0 0 24 24" class="${i<n?'on':''}" aria-hidden="true">${STAR}</svg>`;return h+'</span>'}
 const starsFrom=(c,n)=>c===n?3:c>=Math.ceil(n*.75)?2:c>=1?1:0;
@@ -111,7 +114,7 @@ async function saveRound(id,s,essay){
 async function logout(){try{await call('logout',{})}catch(e){}me=null;essays=[];DASH=null;best=LS.get('dcv-best-guest',{})||{};xu=LS.get('dcv-xu-guest',{total:0,peak:0})||{total:0,peak:0};renderTotal();if(location.hash)location.hash='';else renderMap()}
 function renderTotal(){
   // tổng sao gộp Cơ bản + Nâng cao (khớp với báo cáo)
-  const ids=[...GAMES.map(g=>g.id),...NCG().map(g=>g.id)],t=ids.reduce((a,id)=>a+(best[id]||0),0);
+  const ids=[...GAMES.map(g=>g.id),...NCG().map(g=>g.id),...L3G().map(g=>g.id)],t=ids.reduce((a,id)=>a+(best[id]||0),0);
   document.getElementById('total').innerHTML=(me?`<span class="who">${esc(isStudent()?me.name+' · '+me.code:me.name)}</span>`:'')+
     (isStaff()?`<a class="who-link" href="#theo-doi">${me.role==='parent'?'Báo cáo của con':'Bảng theo dõi'}</a>${aiPill()}`:`<svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg>${t}/${ids.length*3}<a class="xu-link" href="#qua" title="Kệ quà">${COIN}<b>${Math.max(0,(xu.total||0)+(jarOn()?0:((G&&G.xu)||0)))}</b> xu</a>${isStudent()&&!xu.wrote?`<a class="jar-pill" href="#thi-thu" title="Viết 1 đoạn văn để mở hũ">🔒 Hũ hôm nay: <b>${Math.max(0,(xu.jar||0)+(jarOn()?((G&&G.xu)||0):0))}</b> xu</a>`:''}`);
 }
@@ -132,8 +135,8 @@ function goalsHtml(L){
   const sk=xu.streak||0,left=7-(sk%7);
   const streakRow=`<div class="gl"><span>Chuỗi chăm học: <b>🔥 ${sk} ngày liên tiếp</b> · ${sk&&sk%7===0?'vừa nhận +100 xu, giữ chuỗi nhé!':`còn ${left} ngày tới +100 xu`}</span><div class="gbar"><i class="flame" style="width:${Math.round((sk%7||(sk?7:0))/7*100)}%"></i></div></div>`;
   // gợi ý kiếm thêm xu (máy chủ chọn trò bé ít chơi; xong một lượt có câu mới +50 xu, tối đa 3 lần/ngày)
-  const gl=xu.goal,gg=gl&&([...GAMES,...NCG()].find(x=>x.id===gl.game)),gleft=xu.goalLeft??3;
-  const goalRow=gg?`<div class="gl"><span>Gợi ý kiếm thêm xu</span><div class="goalbox"><span>Chơi 1 lượt <b>${esc(gg.name)}${gg.nc?' · Nâng cao':''}</b></span><a class="primary sm" href="#${gg.id}">Chơi ngay →</a></div><span class="fine">${gleft>0?`Xong một lượt có câu mới: +50 xu · hôm nay còn ${gleft} lần`:'Hôm nay đã nhận đủ 3 lần thưởng, mai thưởng tiếp nhé.'}</span></div>`:'';
+  const gl=xu.goal,gg=gl&&([...GAMES,...NCG(),...L3G()].find(x=>x.id===gl.game)),gleft=xu.goalLeft??3;
+  const goalRow=gg?`<div class="gl"><span>Gợi ý kiếm thêm xu</span><div class="goalbox"><span>Chơi 1 lượt <b>${esc(gg.name)}${gg.nc?' · Nâng cao':gg.l3?' · Thử thách':''}</b></span><a class="primary sm" href="#${gg.id}">Chơi ngay →</a></div><span class="fine">${gleft>0?`Xong một lượt có câu mới: +50 xu · hôm nay còn ${gleft} lần`:'Hôm nay đã nhận đủ 3 lần thưởng, mai thưởng tiếp nhé.'}</span></div>`:'';
   const jarRow=`<div class="gl"><span class="jar-t">🔒 Hũ xu hôm nay đang chờ mở</span><div class="goalbox"><span>Viết 1 đoạn văn ở Phòng thi thử để mở hũ <b>${vn(xu.jar||0)} xu</b> + thưởng <b>50 xu</b></span><a class="primary sm" href="#thi-thu">Viết ngay ✍️</a></div><span class="fine">Viết đủ số câu tối thiểu của đề là mở được. Hũ hôm qua (nếu có) cũng mở cùng lúc.</span></div>`;
   return `<div class="goals">${giftRow}${badgeRow}${streakRow}${isStudent()&&!xu.wrote?jarRow:goalRow}</div>`;
 }
@@ -158,13 +161,13 @@ function acct(){
 const starTxt=n=>`<span class="sy">${'★'.repeat(n||0)}</span><span class="se">${'☆'.repeat(3-(n||0))}</span>`;
 function renderMap(){
   G=null;LV='';
-  const NC=NCG(),total=[...GAMES,...NC].reduce((a,g)=>a+size(g.id),0),sv=((xu&&xu.stats)||{}).solved||{};
+  const NC=NCG(),L3=L3G(),total=[...GAMES,...NC,...L3].reduce((a,g)=>a+size(g.id),0),sv=((xu&&xu.stats)||{}).solved||{};
   const pct=id=>{const n=bank(id).length;return n&&isStudent()&&baseId(id)!=='thi-thu'?' · '+Math.round(Math.min(1,(sv[id]||[]).length/n)*100)+'%':''},st3=starTxt;
   // nút mức: tên + % (hoặc ✓ Xong), thanh tiến độ, dòng đã làm/tổng · Kỷ lục sao
   const lvBtn=(id,cls,name,u)=>{const n=bank(id).length,sz=size(id),tr=n&&isStudent()&&baseId(id)!=='thi-thu',f=tr?Math.min(1,(sv[id]||[]).length/n):0,p=Math.round(f*100),done=tr&&f>=1;
     return `<a class="lv ${cls}" href="#${id}"><span class="lvr"><b>${name}</b>${done?'<span class="lvdone">✓ Xong</span>':tr?`<span class="lvp">${p}%</span>`:''}</span>${tr?`<span class="lvtrack"><i class="${done?'g':''}" style="width:${p}%"></i></span>`:''}<small><span>${tr?Math.min(sz,Math.round(f*sz))+'/':''}${sz} ${u}</span><span>Kỷ lục ${st3(best[id])}</span></small></a>`};
   const card=g=>{const nc=NC.find(x=>x.base===g.id);if(!nc)return `<a class="island tinted c${g.is}" href="#${g.id}"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><p>${g.skill}</p><span class="count">${size(g.id)} ${unit(g.id)}</span>${stars(best[g.id]||0)}</a>`;
-    return `<div class="island tinted c${g.is}"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><p>${g.skill}</p><div class="lvs">${lvBtn(g.id,'b','Cơ bản',unit(g.id))}${lvBtn(nc.id,'n','Nâng cao',unit(g.id))}</div></div>`};
+    return `<div class="island tinted c${g.is}"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><p>${g.skill}</p><div class="lvs">${lvBtn(g.id,'b','Cơ bản',unit(g.id))}${lvBtn(nc.id,'n','Nâng cao',unit(g.id))}${(l3=>l3?lvBtn(l3.id,'l','Thử thách',unit(g.id)):'')(L3.find(x=>x.base===g.id))}</div></div>`};
   $app.innerHTML=`<section class="hero"><h1>Chọn một trò chơi để luyện câu văn</h1>
   <p>Mỗi màu là một hòn đảo kỹ năng. Bé chơi trò nào trước cũng được: làm câu dài hơn, hay hơn, rồi viết thành đoạn văn hoàn chỉnh.</p></section>
   ${acct()}
@@ -173,14 +176,14 @@ function renderMap(){
   <p class="note">Ngân hàng có ${total} câu hỏi. Mỗi lượt chơi bốc ngẫu nhiên vài câu, nên mỗi lần chơi sẽ khác nhau.</p>`;
 }
 const streakHtml=()=>G&&G.streak>=2?`${FLAME}Chuỗi ${G.streak}`:'';
-function bar(g,prog){return `<div class="bar"><a class="back" href="#">← Bản đồ</a><div class="gtitle"><span class="isl-tag c${g.is}">${ISLANDS[g.is].name}</span>${g.name}${g.nc?'<span class="nc-tag">Nâng cao</span>':''}</div><span class="streak" id="streak" aria-live="polite">${streakHtml()}</span>${prog?`<div class="prog">${prog}</div>`:''}</div>`}
+function bar(g,prog){return `<div class="bar"><a class="back" href="#">← Bản đồ</a><div class="gtitle"><span class="isl-tag c${g.is}">${ISLANDS[g.is].name}</span>${g.name}${g.nc?'<span class="nc-tag">Nâng cao</span>':g.l3?'<span class="nc-tag l3">Thử thách</span>':''}</div><span class="streak" id="streak" aria-live="polite">${streakHtml()}</span>${prog?`<div class="prog">${prog}</div>`:''}</div>`}
 function msgHtml(m){if(!m)return '';const t={ok:'Đúng rồi!',bad:'Chưa đúng.',weak:'Gần đúng.',info:'Gợi ý:'}[m.k];return `<div class="msg ${m.k}" role="status"><b>${t}</b><span>${m.t}</span></div>`}
 const nextBtn=(last,a,b)=>`<div class="actions"><button class="primary" data-act="next">${last?'Xem kết quả':a}</button></div>`;
 
 /* ---------- Khung chung ---------- */
 function startGame(g){
   G={g,i:0,correct:0,total:0,msg:null,shake:null,xu:0,xuLines:[],streak:0,since:0};
-  LV=g.nc?'-nc':'';
+  LV=g.l3?'-tt':g.nc?'-nc':'';
   if(!qbank(g.base||g.id).length){$app.innerHTML=bar(g)+'<div class="board"><p>Chưa tải được câu hỏi. Hãy tải lại trang.</p></div>';return}
   BUILD[g.base||g.id]();render();
 }
@@ -204,8 +207,8 @@ function toast(n,label,cls){
 }
 // hệ số xu theo đảo (phương án A, 25/11/2026): Mở rộng câu ×1; Câu ghép, Tu từ, Từ ngữ ×½; Viết đoạn ×2
 const ISL_MUL=[1,0.5,0.5,0.5,2];
-const gameIsl=id=>{const g=GAMES.find(x=>x.id===String(id).replace(/-nc$/,''));return g?g.is:0};
-function xuAdd(n,label,quiet){if(!G||isStaff())return;if(G.g&&G.g.nc)n*=2;if(n>0&&G.g)n=Math.floor(n*(ISL_MUL[G.g.is]??1));  /* hệ số xu theo đảo (chỉ áp cho xu cộng) */  /* mức Nâng cao: xu thưởng và xu trừ đều gấp đôi */G.xu+=n;G.xuLines.push([label,n]);if(!quiet)toast(n,label);renderTotal()}
+const gameIsl=id=>{const g=GAMES.find(x=>x.id===baseId(id));return g?g.is:0};
+function xuAdd(n,label,quiet){if(!G||isStaff())return;if(G.g)n*=lvMul(G.g);if(n>0&&G.g)n=Math.floor(n*(ISL_MUL[G.g.is]??1));  /* hệ số xu theo đảo (chỉ áp cho xu cộng) */  /* mức Nâng cao: xu thưởng và xu trừ đều gấp đôi */G.xu+=n;G.xuLines.push([label,n]);if(!quiet)toast(n,label);renderTotal()}
 function xuJudge(prev){
   if(!G||isStaff()||G.ended)return;const m=G.msg;if(!m||m===prev)return;
   // đơn vị tính xu: mỗi câu hỏi; trò nhiều bước (một câu có nhiều bước) chỉ tính xu một lần, ở bước đúng đầu tiên
@@ -235,7 +238,7 @@ function renderEnd(){
   const gain=Math.max(0,st-(best[G.g.id]||0));
   if(gain&&!isStaff())xuAdd(gain*XU.star,`Thêm ${gain} sao mới (kỷ lục ${st} sao)`,true);
   G.ended=true;const lines=groupLines(G.xuLines),delta=G.xu,gid=G.g.id;
-  const lst=G.g.nc?NCG():GAMES,idx=lst.findIndex(x=>x.id===G.g.id),nx=lst[idx+1];
+  const lst=G.g.l3?L3G():G.g.nc?NCG():GAMES,idx=lst.findIndex(x=>x.id===G.g.id),nx=lst[idx+1];
   $app.innerHTML=bar(G.g)+`<div class="board end">
     <div class="stamp"><span><span class="big">${st}</span>sao</span></div>${stars(st,true)}
     <h2>Hoàn thành “${G.g.name}”!</h2>
@@ -535,7 +538,7 @@ BUILD['thi-thu']=()=>{
 };
 // gợi ý dàn bài: câu hỏi dẫn ý (không có bài mẫu); nhãn yêu cầu chỉ hiện khi đề cần; Nâng cao không hiện từ ngữ gợi ý
 function hintHtml(D){
-  const g=GOIY[D.de],[mo,ket]=GOIY_MAU[g[0]],nc=G.g.id.endsWith('-nc'),NL={tn:'trạng ngữ',gh:'kết từ',ss:'so sánh',lk:'từ nối'};
+  const g=GOIY[D.de],[mo,ket]=GOIY_MAU[g[0]],nc=/-(nc|tt)$/.test(G.g.id),NL={tn:'trạng ngữ',gh:'kết từ',ss:'so sánh',lk:'từ nối'};
   const q=t=>{const used=[];const txt=t.replace(/\{s\}/g,g[1]).replace(/\s*\[(tn|gh|ss|lk)\]/g,(m,k)=>{if(D.needs.includes(k))used.push(k);return ''});return `<li>${esc(txt)}${used.map(k=>`<span class="need n-${k}">${NL[k]}</span>`).join('')}</li>`};
   const a=Math.max(1,D.min-2),b=Math.max(a,D.max-2);
   return `<div class="hint"><p class="ht">💡 Dàn bài gợi ý</p>
@@ -777,7 +780,7 @@ function aiCard(){const c=DASH&&DASH.aicredit;if(!c)return '';
   <p class="fine">Số dư gốc và mức cảnh báo chỉ nhập ở app tiếng Anh, Đảo Câu Văn chỉ đọc. Hai app cùng trừ chi phí của nhau nên hiện cùng một số. Đây là ước tính theo số token, thỉnh thoảng nhập lại số dư thật trên console cho khớp.</p></div>`}
 const islPct=b=>ISLANDS.map((_,k)=>{const gs=GAMES.filter(g=>g.is===k);return {k,got:gs.reduce((a,g)=>a+((b||{})[g.id]||0),0),max:gs.length*3}});
 // tổng sao gộp Cơ bản + Nâng cao của mỗi đảo (báo cáo học sinh)
-const islPctAll=b=>ISLANDS.map((_,k)=>{const ids=GAMES.filter(g=>g.is===k).flatMap(g=>bank(g.id+'-nc').length?[g.id,g.id+'-nc']:[g.id]);return {k,got:ids.reduce((a,id)=>a+((b||{})[id]||0),0),max:ids.length*3}});
+const islPctAll=b=>ISLANDS.map((_,k)=>{const ids=GAMES.filter(g=>g.is===k).flatMap(g=>[g.id,...['-nc','-tt'].filter(x=>bank(g.id+x).length).map(x=>g.id+x)]);return {k,got:ids.reduce((a,id)=>a+((b||{})[id]||0),0),max:ids.length*3}});
 const fmtDate=s=>s?new Date(s).toLocaleDateString('vi-VN'):'chưa chơi';
 const shortIsl=k=>ISLANDS[k].name.replace('Đảo ','');
 async function renderDash(h){
@@ -911,8 +914,12 @@ const TIER_ART={
  'isl-2':'<path d="M12 18 L24 14 L40 18 L52 14 L52 46 L40 50 L24 46 L12 50 Z" fill="#FAC775"/><path d="M24 14 V46 M40 18 V50" stroke="#BA7517" stroke-width="1.5"/><path d="M18 40 C24 34 28 38 32 30" stroke="#854F0B" stroke-width="2" stroke-dasharray="3 3" fill="none"/><path d="M38 24 L46 32 M46 24 L38 32" stroke="#E24B4A" stroke-width="3.5" stroke-linecap="round"/>',
  'nisl-1':'<path d="M14 40 L46 20" stroke="#BA7517" stroke-width="9" stroke-linecap="round"/><path d="M40 24 L50 18" stroke="#FAC775" stroke-width="11" stroke-linecap="round"/><path d="M14 40 L20 36" stroke="#854F0B" stroke-width="7" stroke-linecap="round"/><path d="M30 34 L26 50 M30 34 L36 50" stroke="#D3D1C7" stroke-width="3" stroke-linecap="round"/>',
  'nisl-3':'<circle cx="32" cy="32" r="14" fill="none" stroke="#FAC775" stroke-width="5"/><g stroke="#FAC775" stroke-width="4" stroke-linecap="round"><path d="M32 10V54M10 32H54M16 16L48 48M48 16L16 48"/></g><circle cx="32" cy="32" r="5" fill="#BA7517"/>',
+ 'lisl-1':'<path d="M8 48 C16 40 48 40 56 48 C48 54 16 54 8 48 Z" fill="#FAC775"/><path d="M30 44 V12" stroke="#F1EFE8" stroke-width="2.5"/><path d="M30 12 L48 18 L30 24 Z" fill="#E24B4A"/><path d="M34 22 L36 18 L39 21 L42 17 L44 22 Z" fill="#FAC775"/>',
+ 'lisl-3':'<path d="M4 50 C12 44 18 54 26 48 C34 42 40 54 48 48 C54 44 58 48 60 50 L60 60 L4 60 Z" fill="#185FA5"/><path d="M16 50 C14 36 22 26 32 22 C38 20 44 22 46 16" stroke="#1D9E75" stroke-width="8" fill="none" stroke-linecap="round"/><path d="M42 18 C44 10 54 10 56 16 C57 20 53 22 48 21 Z" fill="#1D9E75"/><path d="M48 21 L58 24 L50 25 Z" fill="#FAC775"/><circle cx="51" cy="15" r="2" fill="#FAC775"/><path d="M22 30 L16 26 M26 26 L22 20 M30 23 L28 17" stroke="#5DCAA5" stroke-width="3" stroke-linecap="round"/>',
+ 'lisl-2':'<path d="M6 50 C14 44 18 54 26 48 C34 42 38 54 46 48 C52 44 56 48 58 50 L58 58 L6 58 Z" fill="#378ADD"/><path d="M32 50 V18" stroke="#FAC775" stroke-width="4" stroke-linecap="round"/><path d="M20 12 V22 C20 28 44 28 44 22 V12 M32 10 V22" stroke="#FAC775" stroke-width="4" fill="none" stroke-linecap="round"/>',
  'nisl-2':'<path d="M10 38 C14 22 50 22 54 38 Z" fill="#2C2C2A"/><rect x="10" y="38" width="44" height="6" rx="3" fill="#2C2C2A"/><path d="M12 40 H52" stroke="#FAC775" stroke-width="2"/><path d="M32 24 L34 29 L39 29 L35 32 L36.5 37 L32 34 L27.5 37 L29 32 L25 29 L30 29 Z" fill="#FAC775"/>',
  king:'<circle cx="32" cy="32" r="22" fill="none" stroke="#85B7EB" stroke-width="1.5" stroke-dasharray="3 3"/><ellipse cx="32" cy="11" rx="7" ry="4" fill="#378ADD"/><ellipse cx="52" cy="25" rx="7" ry="4" fill="#639922"/><ellipse cx="45" cy="49" rx="7" ry="4" fill="#7F77DD"/><ellipse cx="19" cy="49" rx="7" ry="4" fill="#EF9F27"/><ellipse cx="12" cy="25" rx="7" ry="4" fill="#D4537E"/><path d="M32 20 L35.5 28.5 L44.5 28.5 L37.5 34 L40 43 L32 37.5 L24 43 L26.5 34 L19.5 28.5 L28.5 28.5 Z" fill="#FAC775" stroke="#EF9F27" stroke-width="1.5" stroke-linejoin="round"/>',
+ god:'<path d="M4 50 C12 42 18 54 26 46 C34 38 40 54 48 46 C54 40 58 46 60 48 L60 60 L4 60 Z" fill="#185FA5"/><path d="M32 52 V20" stroke="#FAC775" stroke-width="4" stroke-linecap="round"/><path d="M20 14 V24 C20 30 44 30 44 24 V14 M32 12 V24" stroke="#FAC775" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M22 10 L26 4 L32 9 L38 4 L42 10 Z" fill="#E24B4A" stroke="#FAC775" stroke-width="1.5"/>',
  legend:'<path d="M8 30 C16 22 22 24 26 30 C22 30 16 32 12 38 Z M56 30 C48 22 42 24 38 30 C42 30 48 32 52 38 Z" fill="#AFA9EC"/><path d="M32 12 L37 25 L51 25 L40 33 L44 47 L32 39 L20 47 L24 33 L13 25 L27 25 Z" fill="#FAC775" stroke="#EF9F27" stroke-width="2" stroke-linejoin="round"/>'};
 const FLAME_ART=(a,b)=>`<path d="M32 54 C20 54 15 45 17 36 C19 29 25 26 26 18 C31 23 32 28 31 33 C35 30 38 25 38 20 C46 27 49 36 47 43 C45 50 39 54 32 54 Z" fill="${a}"/><path d="M32 54 C26 54 23 49 25 44 C27 40 30 38 31 34 C35 38 39 42 38 47 C37 51 35 54 32 54 Z" fill="${b}"/>`;
 const CAL=(c1,c2,c3,n,fs)=>`<rect x="15" y="17" width="34" height="32" rx="5" fill="${c1}"/><rect x="15" y="17" width="34" height="9" rx="4" fill="${c2}"/><rect x="22" y="13" width="4" height="8" rx="2" fill="${c3}"/><rect x="38" y="13" width="4" height="8" rx="2" fill="${c3}"/><text x="32" y="44" font-size="${fs}" font-weight="700" fill="${c3}" text-anchor="middle" font-family="sans-serif">${n}</text>`;
@@ -928,14 +935,18 @@ const OTHER_ICO={
  write3s:['#4B1528','<path d="M42 16 L48 22 L26 44 L20 38 Z" fill="#D4537E"/><path d="M20 38 L26 44 L16 48 Z" fill="#F1EFE8"/><path d="M42 16 L48 22 L51 19 L45 13 Z" fill="#FAC775"/><path d="M12 30 C18 24 22 18 26 12 M30 52 C36 48 42 46 52 42" stroke="#FAC775" stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray="1 5"/><path d="M50 32 L51.5 36 L55.5 37.5 L51.5 39 L50 43 L48.5 39 L44.5 37.5 L48.5 36 Z" fill="#FAC775"/>'],
  writeN5:['#26215C','<path d="M32 22 C26 17 17 17 11 19 L11 47 C17 45 26 45 32 50 Z" fill="#EEEDFE"/><path d="M32 22 C38 17 47 17 53 19 L53 47 C47 45 38 45 32 50 Z" fill="#CECBF6"/><path d="M16 26 H27 M16 32 H27 M37 26 H48 M37 32 H48" stroke="#7F77DD" stroke-width="2" stroke-linecap="round"/>'],
  writeN10:['#26215C','<path d="M32 26 C26 21 17 21 11 23 L11 51 C17 49 26 49 32 54 Z" fill="#EEEDFE"/><path d="M32 26 C38 21 47 21 53 23 L53 51 C47 49 38 49 32 54 Z" fill="#CECBF6"/><path d="M32 20 C26 14 18 16 18 22 C18 27 24 30 32 36 C40 30 46 27 46 22 C46 16 38 14 32 20 Z" fill="#E24B4A"/>'],
+ writeL10:['#042C53','<path d="M48 10 C38 14 30 24 26 40 L30 42 C36 28 42 20 48 10 Z" fill="#E6F1FB"/><path d="M26 40 L24 48 L30 42 Z" fill="#2C2C2A"/><rect x="14" y="46" width="16" height="10" rx="3" fill="#185FA5"/><rect x="17" y="43" width="10" height="4" rx="1" fill="#0C447C"/>'],
+ writeL20:['#042C53','<path d="M14 46 C10 36 12 26 18 18 M50 46 C54 36 52 26 46 18" stroke="#5DCAA5" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M42 12 C34 16 28 26 26 42 L30 43 C34 30 38 22 42 12 Z" fill="#E6F1FB"/><path d="M26 42 L25 50 L30 43 Z" fill="#2C2C2A"/>'],
+ writeL35:['#412402','<path d="M14 46 C10 36 12 26 18 18 M50 46 C54 36 52 26 46 18" stroke="#EF9F27" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M42 12 C34 16 28 26 26 42 L30 43 C34 30 38 22 42 12 Z" fill="#FAC775"/><path d="M26 42 L25 50 L30 43 Z" fill="#854F0B"/><rect x="22" y="50" width="20" height="5" rx="2" fill="#EF9F27"/>'],
  writeN20:['#26215C','<rect x="17" y="18" width="30" height="36" rx="3" fill="#7F77DD"/><rect x="17" y="18" width="5" height="36" fill="#534AB7"/><path d="M34.5 26 L37 32 L43 32.5 L38.5 36.5 L40 42.5 L34.5 39 L29 42.5 L30.5 36.5 L26 32.5 L32 32 Z" fill="#FAC775"/><path d="M14 12 L16 16 M50 12 L48 16 M32 6 V11" stroke="#FAC775" stroke-width="2.5" stroke-linecap="round"/>']};
 const svgIco=(bg,art,cls)=>`<svg class="${cls}" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="${bg}"/>${art}</svg>`;
 const islIco=(k,cls='isl-ico')=>svgIco(ISL_BG[k],ISL_ART[k],cls);
 // icon riêng cho huy hiệu đảo và tối thượng; các huy hiệu khác giữ huy chương / ổ khóa
-function badgeIco(b){const m=/^(n?isl)(\d)-(\d)$/.exec(b.id);
+function badgeIco(b){const m=/^([nl]?isl)(\d)-(\d)$/.exec(b.id);
   if(m)return svgIco(ISL_DK[+m[2]],TIER_ART[m[1]+'-'+m[3]],'bico');
   if(b.id==='king')return svgIco('#0C447C',TIER_ART.king,'bico');
   if(b.id==='legend')return svgIco('#26215C',TIER_ART.legend,'bico');
+  if(b.id==='god')return svgIco('#042C53',TIER_ART.god,'bico');
   if(OTHER_ICO[b.id])return svgIco(OTHER_ICO[b.id][0],OTHER_ICO[b.id][1],'bico');
   return '';}
 const MEDAL='<svg class="medal-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h8l-2.5 6h-3z"/><circle cx="12" cy="15" r="6"/></svg>';
@@ -943,6 +954,8 @@ const LOCK='<svg class="medal-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x
 const TIERS=[['dong','Đồng',.4],['bac','Bạc',.7],['vang','Vàng',1]];
 // chuỗi bậc Nâng cao tiếp nối Đồng–Bạc–Vàng: id vẫn là <trò>-nc-dong/bac/vang
 const NTIERS=[['dong','Titan',.4,'titan'],['bac','Platinum',.7,'plat'],['vang','Emerald',1,'emer']];
+// Thử thách tiếp nối: Sapphire–Ruby–Diamond, id <trò>-tt-dong/bac/vang
+const LTIERS=[['dong','Sapphire',.4,'saph'],['bac','Ruby',.7,'ruby'],['vang','Diamond',1,'kc']];
 const GAMEB=()=>GAMES.filter(g=>g.id!=='thi-thu');
 function badgeList(x,ess){
   const st=(x&&x.stats)||{},sv=st.solved||{},E=ess||[],out=[];
@@ -950,34 +963,42 @@ function badgeList(x,ess){
     TIERS.forEach(([k,name,p])=>{const need=Math.ceil(n*p);out.push({id:g.id+'-'+k,grp:'Bộ câu hỏi',tier:k,isl:g.is,name:name+' · '+g.name,how:`Trả lời đúng ngay lần đầu ${need}/${n} câu khác nhau của trò ${g.name}.`,have:Math.min(got,need),need,ok:got>=need})})}
   for(const g of NCG().filter(g=>g.base!=='thi-thu')){const n=bank(g.id).length,got=(sv[g.id]||[]).length;
     NTIERS.forEach(([k,name,p,t])=>{const need=Math.ceil(n*p);out.push({id:g.id+'-'+k,grp:'Bộ câu hỏi',tier:t,isl:g.is,name:name+' · '+g.name,how:`Trả lời đúng ngay lần đầu ${need}/${n} câu Nâng cao của trò ${g.name}.`,have:Math.min(got,need),need,ok:got>=need})})}
-  // chuỗi huy hiệu đảo (phiêu lưu biển): Thủy thủ nhí (Đồng) → Nhà thám hiểm (Bạc) → Thợ săn kho báu (Vàng) → Hoa tiêu (Titan) → Thuyền trưởng (Platinum) → Đô đốc (Emerald); mức 3 thêm Chúa đảo → Chủ nhân Rồng biển → Thần biển
+  // chuỗi huy hiệu đảo (phiêu lưu biển): Thủy thủ nhí (Đồng) → Nhà thám hiểm (Bạc) → Thợ săn kho báu (Vàng) → Hoa tiêu (Titan) → Thuyền trưởng (Platinum) → Đô đốc (Emerald); Thử thách thêm Chúa đảo → Chủ nhân Rồng biển → Thần biển
   ISLANDS.forEach((isl,k)=>{const gs=GAMEB().filter(g=>g.is===k),has=id=>gs.filter(g=>(out.find(b=>b.id===g.id+id)||{}).ok).length,short=isl.name.replace('Đảo ','');
     [['isl'+k+'-1','dong','Thủy thủ nhí','-dong','Đồng'],['isl'+k+'-3','bac','Nhà thám hiểm','-bac','Bạc'],['isl'+k+'-2','vang','Thợ săn kho báu','-vang','Vàng'],
-     ['nisl'+k+'-1','titan','Hoa tiêu','-nc-dong','Titan'],['nisl'+k+'-3','plat','Thuyền trưởng','-nc-bac','Platinum'],['nisl'+k+'-2','emer','Đô đốc','-nc-vang','Emerald']]
-    .forEach(([id,tier,name,suf,tn])=>{if(suf.startsWith('-nc')&&!bank(gs[0].id+'-nc').length)return;const hv=has(suf);out.push({id,grp:'Đảo',tier,isl:k,name:name+' '+isl.name,short:name,hs:`${tn} ở cả ${gs.length} trò`,how:`${tn} ở cả ${gs.length} trò của ${isl.name}.`,have:hv,need:gs.length,ok:hv===gs.length})})});
+     ['nisl'+k+'-1','titan','Hoa tiêu','-nc-dong','Titan'],['nisl'+k+'-3','plat','Thuyền trưởng','-nc-bac','Platinum'],['nisl'+k+'-2','emer','Đô đốc','-nc-vang','Emerald'],
+     ['lisl'+k+'-1','saph','Chúa đảo','-tt-dong','Sapphire'],['lisl'+k+'-3','ruby','Chủ nhân Rồng biển','-tt-bac','Ruby'],['lisl'+k+'-2','kc','Thần biển','-tt-vang','Diamond']]
+    .forEach(([id,tier,name,suf,tn])=>{{const lv=(/^-(nc|tt)-/.exec(suf)||[])[1];if(lv&&!gs.every(g=>bank(g.id+'-'+lv).length))return}const hv=has(suf);out.push({id,grp:'Đảo',tier,isl:k,name:name+' '+isl.name,short:name,hs:`${tn} ở cả ${gs.length} trò`,how:`${tn} ở cả ${gs.length} trò của ${isl.name}.`,have:hv,need:gs.length,ok:hv===gs.length})})});
+  for(const g of L3G().filter(g=>g.base!=='thi-thu')){const n=bank(g.id).length,got=(sv[g.id]||[]).length;
+    LTIERS.forEach(([k,name,p,t])=>{const need=Math.ceil(n*p);out.push({id:g.id+'-'+k,grp:'Bộ câu hỏi',tier:t,isl:g.is,name:name+' · '+g.name,how:`Trả lời đúng ngay lần đầu ${need}/${n} câu Thử thách của trò ${g.name}.`,have:Math.min(got,need),need,ok:got>=need})})}
   const ms=st.maxStreak||0;[[10,'Ngọn lửa nhỏ'],[20,'Ngọn lửa lớn'],[30,'Ngọn lửa bất diệt']].forEach(([n,name],i)=>out.push({id:'streak'+n,grp:'Chuỗi đúng',tier:TIERS[i][0],name,hs:`Chuỗi ${n} câu đúng`,how:`Đúng liên tiếp ${n} câu trong một lượt chơi.`,have:Math.min(ms,n),need:n,ok:ms>=n}));
   out.push({id:'perfect5',grp:'Hoàn hảo',tier:'vang',name:'Không một lỗi',hs:'5 lượt đúng hết',how:'Có 5 lượt chơi đúng hết ngay lần đầu.',have:Math.min(st.perfect||0,5),need:5,ok:(st.perfect||0)>=5});
   const bd=st.bestDays||0;[[7,'Chăm học 7 ngày','bac'],[30,'Chăm học 30 ngày','vang']].forEach(([n,name,tier])=>out.push({id:'days'+n,grp:'Chăm chỉ',tier,name,hs:`Chơi liên tục ${n} ngày`,how:`Chơi liên tục ${n} ngày.`,have:Math.min(bd,n),need:n,ok:bd>=n}));
   // chuỗi Viết văn: đếm số đề khác nhau (nộp lại cùng một đề chỉ tính một lần)
-  const de=f=>new Set(E.filter(f).map(e=>e.de)).size,sub=de(()=>true),s2=de(e=>(e.stars||0)>=2),full=de(e=>e.stars===3),nc3=de(e=>e.nc&&e.stars===3);
+  const de=f=>new Set(E.filter(f).map(e=>e.de)).size,sub=de(()=>true),s2=de(e=>(e.stars||0)>=2),full=de(e=>e.stars===3),nc3=de(e=>e.nc&&e.stars===3),l33=de(e=>e.tt&&e.stars===3),hasL3=bank('thi-thu-tt').length>0;
   [['write5','dong','Cây bút tập sự','Nộp bài cho 5 đề thi thử khác nhau.',sub,5,'Nộp 5 đề khác nhau'],
    ['write2s','bac','Cây bút nhí','Có 10 đề thi thử đạt từ 2 sao trở lên.',s2,10,'10 đề từ 2 sao'],
    ['write3s','vang','Cây bút triển vọng','Có 10 đề thi thử đạt đủ yêu cầu (3 sao).',full,10,'10 đề đạt 3 sao'],
    ['writeN5','titan','Tác giả nhí','Có 10 đề thi thử Nâng cao đạt 3 sao.',nc3,10,'10 đề Nâng cao 3 sao'],
    ['writeN10','plat','Tác giả được yêu thích','Có 20 đề thi thử Nâng cao đạt 3 sao.',nc3,20,'20 đề Nâng cao 3 sao'],
-   ['writeN20','emer','Tác giả nổi tiếng','Có 35 đề thi thử Nâng cao đạt 3 sao.',nc3,35,'35 đề Nâng cao 3 sao']]
+   ['writeN20','emer','Tác giả nổi tiếng','Có 35 đề thi thử Nâng cao đạt 3 sao.',nc3,35,'35 đề Nâng cao 3 sao'],
+   ...(hasL3?[['writeL10','saph','Nhà văn trẻ','Có 10 đề thi thử Thử thách đạt 3 sao.',l33,10,'10 đề Thử thách đạt 3 sao'],
+   ['writeL20','ruby','Nhà văn tài năng','Có 20 đề thi thử Thử thách đạt 3 sao.',l33,20,'20 đề Thử thách đạt 3 sao'],
+   ['writeL35','kc','Đại văn hào','Có 35 đề thi thử Thử thách đạt 3 sao.',l33,35,'35 đề Thử thách đạt 3 sao']]:[])]
   .forEach(([id,tier,name,how,have,need,hs])=>out.push({id,grp:'Viết văn',tier,name,how,hs,have:Math.min(have,need),need,ok:have>=need}));
   const kings=out.filter(b=>/^isl\d-2$/.test(b.id)&&b.ok).length;
   out.push({id:'king',grp:'Tối thượng',tier:'vang',name:'Vua Đảo Câu Văn',hs:'Đủ 5 huy hiệu Thợ săn kho báu',how:'Có đủ 5 huy hiệu Thợ săn kho báu (Vàng ở mọi trò của cả 5 đảo).',have:kings,need:5,ok:kings>=5});
   const legends=out.filter(b=>/^nisl\d-2$/.test(b.id)&&b.ok).length;
   out.push({id:'legend',grp:'Tối thượng',tier:'emer',name:'Huyền thoại Đảo Câu Văn',hs:'Đủ 5 huy hiệu Đô đốc',how:'Có đủ 5 huy hiệu Đô đốc (Emerald ở mọi trò của cả 5 đảo).',have:legends,need:5,ok:legends>=5});
+  if(L3G().length){const gods=out.filter(b=>/^lisl\d-2$/.test(b.id)&&b.ok).length;
+    out.push({id:'god',grp:'Tối thượng',tier:'kc',name:'Thủy Thần Đảo Câu Văn',hs:'Đủ 5 huy hiệu Thần biển',how:'Có đủ 5 huy hiệu Thần biển (Diamond ở mọi trò của cả 5 đảo).',have:gods,need:5,ok:gods>=5})}
   return out;
 }
-function BREWARD(id){let m=/^([a-z-]+)-nc-(dong|bac|vang)$/.exec(id);if(m)return {dong:200,bac:250,vang:300}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^nisl(\d)-([123])$/.exec(id);if(m)return {1:400,3:500,2:600}[m[2]]*ISL_MUL[+m[1]];m=/^([a-z-]+)-(dong|bac|vang)$/.exec(id);if(m)return {dong:50,bac:100,vang:150}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^isl(\d)-([123])$/.exec(id);if(m)return {1:100,3:200,2:300}[m[2]]*ISL_MUL[+m[1]];return {streak10:100,streak20:200,streak30:300,perfect5:200,days7:150,days30:300,write5:200,write2s:300,write3s:400,writeN5:600,writeN10:800,writeN20:1200,king:1000,legend:2000}[id]||0}
+function BREWARD(id){let m=/^([a-z-]+)-tt-(dong|bac|vang)$/.exec(id);if(m)return {dong:350,bac:400,vang:450}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^lisl(\d)-([123])$/.exec(id);if(m)return {1:700,3:800,2:900}[m[2]]*ISL_MUL[+m[1]];m=/^([a-z-]+)-nc-(dong|bac|vang)$/.exec(id);if(m)return {dong:200,bac:250,vang:300}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^nisl(\d)-([123])$/.exec(id);if(m)return {1:400,3:500,2:600}[m[2]]*ISL_MUL[+m[1]];m=/^([a-z-]+)-(dong|bac|vang)$/.exec(id);if(m)return {dong:50,bac:100,vang:150}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^isl(\d)-([123])$/.exec(id);if(m)return {1:100,3:200,2:300}[m[2]]*ISL_MUL[+m[1]];return {streak10:100,streak20:200,streak30:300,perfect5:200,days7:150,days30:300,write5:200,write2s:300,write3s:400,writeN5:600,writeN10:800,writeN20:1200,king:1000,legend:2000,god:3000,writeL10:1500,writeL20:2000,writeL35:3000}[id]||0}
 function badgeHtml(b,paid){const n=BREWARD(b.id);return `<div class="bdg ${b.ok?'on':'off'} t-${b.tier}" title="${esc(b.name+': '+b.how)}"><span class="medal">${badgeIco(b)||(b.ok?MEDAL:LOCK)}</span><b>${esc(b.short||b.name)}</b><span class="fine">${esc(b.hs||b.how)}</span><div class="bfoot"><div class="meter sm${b.ok?' full':''}"><div style="width:${b.ok?100:Math.round(b.have/b.need*100)}%"></div></div>${b.ok?'<span class="fine got">✓ Đã mở khóa</span>':`<span class="fine">${b.have}/${b.need}</span>`}<span class="rw">${b.ok?((paid||[]).includes(b.id)?`Đã nhận ${vn(n)} xu`:`Sẽ nhận ${vn(n)} xu sau lượt chơi tới`):`Thưởng ${vn(n)} xu`}</span></div></div>`}
-function gameBadgeCard(g,sv){const n=bank(g.id).length,got=Math.min((sv[g.id]||[]).length,n),nid=g.id+'-nc',nn=bank(nid).length,ng=Math.min((sv[nid]||[]).length,nn);
+function gameBadgeCard(g,sv){const n=bank(g.id).length,got=Math.min((sv[g.id]||[]).length,n),nid=g.id+'-nc',nn=bank(nid).length,ng=Math.min((sv[nid]||[]).length,nn),lid=g.id+'-tt',ln=bank(lid).length,lg=Math.min((sv[lid]||[]).length,ln);
   const bar=(lbl,a,t)=>`<div class="lvbar"><span>${lbl}</span><div class="meter sm"><div style="width:${t?Math.round(a/t*100):0}%"></div></div><span class="fine">${a}/${t}</span></div>`;
-  return `<div class="gbdg c${g.is}"><b>${g.name}</b>${bar('Cơ bản',got,n)}${nn?bar('Nâng cao',ng,nn):''}<span class="pips">${TIERS.map(([k,name,p])=>`<span class="pip t-${k}${got>=Math.ceil(n*p)?' on':''}" title="${name}: ${Math.ceil(n*p)} câu Cơ bản">${name}</span>`).join('')}</span><span class="pips">${nn?NTIERS.map(([k,name,p,t])=>`<span class="pip t-${t}${ng>=Math.ceil(nn*p)?' on':''}" title="${name}: ${Math.ceil(nn*p)} câu Nâng cao">${name}</span>`).join(''):''}</span></div>`}
+  return `<div class="gbdg c${g.is}"><b>${g.name}</b>${bar('Cơ bản',got,n)}${nn?bar('Nâng cao',ng,nn):''}${ln?bar('Thử thách',lg,ln):''}<span class="pips">${TIERS.map(([k,name,p])=>`<span class="pip t-${k}${got>=Math.ceil(n*p)?' on':''}" title="${name}: ${Math.ceil(n*p)} câu Cơ bản">${name}</span>`).join('')}</span><span class="pips">${nn?NTIERS.map(([k,name,p,t])=>`<span class="pip t-${t}${ng>=Math.ceil(nn*p)?' on':''}" title="${name}: ${Math.ceil(nn*p)} câu Nâng cao">${name}</span>`).join(''):''}</span>${ln?`<span class="pips">${LTIERS.map(([k,name,p,t])=>`<span class="pip t-${t}${lg>=Math.ceil(ln*p)?' on':''}" title="${name}: ${Math.ceil(ln*p)} câu Thử thách">${name}</span>`).join('')}</span>`:''}</div>`}
 function badgePanel(x,ess){
   const L=badgeList(x,ess),sv=((x&&x.stats)||{}).solved||{};
   return `<p class="bsum">${MEDAL}<b>${L.filter(b=>b.ok).length}</b>/${L.length} huy hiệu</p>
@@ -1054,7 +1075,7 @@ function route(){
   if(h==='theo-doi'||h.startsWith('hs-'))return renderDash(h);
   if(h==='qua')return renderShelf();
   if(h==='huy-hieu')return renderBadges();
-  const g=GAMES.find(x=>x.id===h)||NCG().find(x=>x.id===h);if(g)startGame(g);else renderMap();window.scrollTo(0,0);
+  const g=GAMES.find(x=>x.id===h)||NCG().find(x=>x.id===h)||L3G().find(x=>x.id===h);if(g)startGame(g);else renderMap();window.scrollTo(0,0);
 }
 addEventListener('hashchange',route);
 $app.innerHTML='<p class="fine">Đang tải…</p>';
