@@ -161,13 +161,14 @@ function acct(){
 }
 // sao dạng chữ: sao đã đạt tô vàng, sao chưa đạt mờ
 const starTxt=n=>`<span class="sy">${'★'.repeat(n||0)}</span><span class="se">${'☆'.repeat(3-(n||0))}</span>`;
+const lvSumTT=x=>{const sv=((x&&x.stats)||{}).solved||{};let got=0,n=0;L3G().forEach(g=>{if(g.base==='thi-thu')return;const m=bank(g.id).length;n+=m;got+=Math.min((sv[g.id]||[]).length,m)});return n?` · <b>Thử thách ${vn(got)}/${vn(n)} (${Math.round(got/n*100)}%)</b>`:''};
 function renderMap(){
   G=null;LV='';
   const NC=NCG(),L3=L3G(),total=[...GAMES,...NC,...L3].reduce((a,g)=>a+size(g.id),0),sv=((xu&&xu.stats)||{}).solved||{};
   const pct=id=>{const n=bank(id).length;return n&&isStudent()&&baseId(id)!=='thi-thu'?' · '+Math.round(Math.min(1,(sv[id]||[]).length/n)*100)+'%':''},st3=starTxt;
   // nút mức: tên + % (hoặc ✓ Xong), thanh tiến độ, dòng đã làm/tổng · Kỷ lục sao
   const lvBtn=(id,cls,name,u)=>{const n=bank(id).length,sz=size(id),tr=n&&isStudent()&&baseId(id)!=='thi-thu',f=tr?Math.min(1,(sv[id]||[]).length/n):0,p=Math.round(f*100),done=tr&&f>=1;
-    return `<a class="lv ${cls}" href="#${id}"><span class="lvr"><b>${name}</b>${done?'<span class="lvdone">✓ Xong</span>':tr?`<span class="lvp">${p}%</span>`:''}</span>${tr?`<span class="lvtrack"><i class="${done?'g':''}" style="width:${p}%"></i></span>`:''}<small><span>${tr?Math.min(sz,Math.round(f*sz))+'/':''}${sz} ${u}</span><span>Kỷ lục ${st3(best[id])}</span></small></a>`};
+    return `<a class="lv ${cls}${done?' done':''}" href="#${id}" title="${name}${tr?': '+p+'%':''}"><b>${name}</b><span class="lvn">${done?'✓ ':''}${tr?Math.min(sz,Math.round(f*sz))+'/':''}${sz}${tr?'':' '+u}</span><span class="lvst">${st3(best[id])}</span>${tr?`<span class="lvtrack"><i class="${done?'g':''}" style="width:${p}%"></i></span>`:''}</a>`};
   const card=g=>{const nc=NC.find(x=>x.base===g.id);if(!nc)return `<a class="island tinted c${g.is}" href="#${g.id}"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><p>${g.skill}</p><span class="count">${size(g.id)} ${unit(g.id)}</span>${stars(best[g.id]||0)}</a>`;
     return `<div class="island tinted c${g.is}"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><p>${g.skill}</p><div class="lvs">${lvBtn(g.id,'b','Cơ bản',unit(g.id))}${lvBtn(nc.id,'n','Nâng cao',unit(g.id))}${(l3=>l3?lvBtn(l3.id,'l','Thử thách',unit(g.id)):'')(L3.find(x=>x.base===g.id))}</div></div>`};
   $app.innerHTML=`<section class="hero"><h1>Chọn một trò chơi để luyện câu văn</h1>
@@ -872,11 +873,11 @@ function renderKid(st,o){
   const p=islPct(st.best),t=p.reduce((a,x)=>a+x.got,0),weak=GAMES.filter(g=>(st.best[g.id]||0)<2).map(g=>g.name),ncAll=NCG(),ncOk=ncAll.filter(g=>(st.best[g.id]||0)>=2).length;
   $app.innerHTML=`${o.back?'<div class="bar"><a class="back" href="#theo-doi">← Bảng theo dõi</a></div>':''}${o.top||''}
     <div class="board"><div class="dhead"><h1>Báo cáo của ${esc(st.name)}</h1><span class="fine">Mã ${esc(st.code)} · chơi gần nhất: ${fmtDate(st.updated)} · <span class="sy">★</span> ${islPctAll(st.best).reduce((a,x)=>a+x.got,0)}/${islPctAll(st.best).reduce((a,x)=>a+x.max,0)} sao</span></div>
-      <p class="lvsum">Câu đã làm đúng: <b>Cơ bản ${(q=>`${vn(q.got)}/${vn(q.n)} (${q.p}%)`)(lvSum(st.xu,false))}</b> · <b>Nâng cao ${(q=>`${vn(q.got)}/${vn(q.n)} (${q.p}%)`)(lvSum(st.xu,true))}</b></p>
+      <p class="lvsum">Câu đã làm đúng: <b>Cơ bản ${(q=>`${vn(q.got)}/${vn(q.n)} (${q.p}%)`)(lvSum(st.xu,false))}</b> · <b>Nâng cao ${(q=>`${vn(q.got)}/${vn(q.n)} (${q.p}%)`)(lvSum(st.xu,true))}</b>${lvSumTT(st.xu)}</p>
       <div class="isl-sum">${islPctAll(st.best).map(x=>`<span class="isl-tag c${x.k}">${islIco(x.k)}${shortIsl(x.k)} <span class="sy" aria-hidden="true">★</span> ${x.got}/${x.max} sao</span>`).join('')}</div>
       ${weak.length?`<div class="msg weak"><b>Cơ bản chưa đạt 2 sao:</b><span>${weak.join(', ')}.</span></div>`:'<div class="msg ok"><b>Cơ bản:</b><span>Bé đã đạt từ 2 sao trở lên ở mọi trò chơi.</span></div>'}<div class="msg ${ncOk===ncAll.length?'ok':'info'}"><b>Nâng cao:</b><span>${ncOk}/${ncAll.length} trò đạt từ 2 sao.</span></div>
       <div class="islands">${MIXED.map(g=>{const sv=((st.xu&&st.xu.stats)||{}).solved||{},nc=bank(g.id+'-nc').length,cnt=id=>g.id==='thi-thu'?'':`<span>${Math.min((sv[id]||[]).length,bank(id).length)}/${bank(id).length}</span>`,st3=starTxt;
-        return nc?`<div class="island tinted c${g.is} mini"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><div class="lvrow"><span>Cơ bản ${st3(st.best[g.id])}</span>${cnt(g.id)}</div><div class="lvrow"><span>Nâng cao ${st3(st.best[g.id+'-nc'])}</span>${cnt(g.id+'-nc')}</div></div>`
+        return nc?`<div class="island tinted c${g.is} mini"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><div class="lvrow"><span>Cơ bản ${st3(st.best[g.id])}</span>${cnt(g.id)}</div><div class="lvrow"><span>Nâng cao ${st3(st.best[g.id+'-nc'])}</span>${cnt(g.id+'-nc')}</div>${bank(g.id+'-tt').length?`<div class="lvrow"><span>Thử thách ${st3(st.best[g.id+'-tt'])}</span>${cnt(g.id+'-tt')}</div>`:''}</div>`
           :`<div class="island tinted c${g.is} mini"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3>${stars(st.best[g.id]||0)}</div>`}).join('')}</div></div>
     <h2 class="sec">Xu và quà</h2><div class="board">${shelfHtml(st.xu,{code:st.code,canDecide:!!o.canGift})}${o.canGift?giftEditor(st):''}</div>
     <h2 class="sec">Huy hiệu</h2><div class="board">${badgePanel(st.xu,st.essays)}</div>
