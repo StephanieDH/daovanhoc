@@ -153,6 +153,38 @@ function report(st, p, withLink) {
 // Xu theo mức điểm cao nhất của mỗi đề: 9–10 → 30, 7–8,9 → 15, 5–6,9 → 5 (nhân hệ số đảo Viết đoạn ×2, Nâng cao ×2).
 // Giới hạn: 3 lần chấm mỗi đề, 10 lần mỗi ngày; chấm lại đúng bài đã chấm thì trả kết quả cũ, không tốn lượt.
 const AI_MODEL = 'claude-opus-5-5';
+const AI_PRICE = { in: 4e-6, out: 20e-6 };   // đô la Mỹ mỗi token của AI_MODEL (giống app tiếng Anh)
+// Sổ chi phí AI của Đảo Câu Văn: một dòng riêng trong dcv_progress (mã "_ai"), app tiếng Anh cũng đọc dòng này để trừ tiền.
+const AI_ROW = '_ai';
+async function aiLog(use, noCredit) {
+  const p = await prog(AI_ROW), x = { ...(p.xu || {}) };
+  if (use) x.log = [...(x.log || []), [Date.now(), use.in, use.out]].slice(-5000);
+  x.noCredit = !!noCredit; p.xu = x; await progPut(p);
+}
+const aiCost = u => u[1] * AI_PRICE.in + u[2] * AI_PRICE.out;
+// Tiền chấm AI dùng chung 2 app: số dư gốc và mức cảnh báo nhập ở app tiếng Anh (kv meta/aicredit, chỉ đọc),
+// trừ chi phí AI của app tiếng Anh (kv attempts.aiUse, giá giống nhau) và của Đảo Câu Văn (dòng "_ai") kể từ ngày nhập.
+let enCache = null;
+async function enUses() {
+  if (enCache && Date.now() - enCache.t < 60000) return enCache.v;
+  const v = [];
+  for (let off = 0; off < 50000; off += 1000) {
+    const r = (await sb(`kv?collection=eq.attempts&select=at:data->at,aiUse:data->aiUse&data->aiUse=not.is.null&order=id&limit=1000&offset=${off}`)) || [];
+    for (const a of r) if (a && a.aiUse) v.push([+a.at || 0, +a.aiUse.in || 0, +a.aiUse.out || 0]);
+    if (r.length < 1000) break;
+  }
+  enCache = { t: Date.now(), v }; return v;
+}
+async function aiCredit() {
+  const c = (await kvGet('meta', 'aicredit')) || {}, at = c.at || 0;
+  const en = await enUses(), dcvX = (await prog(AI_ROW)).xu || {}, mine = dcvX.log || [];
+  const sum = a => a.reduce((n, u) => n + aiCost(u), 0), enS = en.filter(u => u[0] >= at), mineS = mine.filter(u => u[0] >= at);
+  const enUsed = sum(enS), dcvUsed = sum(mineS), per = mine.length ? sum(mine) / mine.length : 0.021, enPer = en.length ? sum(en) / en.length : 0.013;
+  const month = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 7), mMine = mine.filter(u => new Date(u[0] + 7 * 3600000).toISOString().slice(0, 7) === month);
+  return { on: !!process.env.ANTHROPIC_API_KEY || LOCAL, balance: c.balance == null ? null : c.balance, at, warn: c.warn == null ? 1 : c.warn,
+    enUsed, enTests: enS.length, enPer, dcvUsed, dcvTests: mineS.length, per, month: sum(mMine), monthTests: mMine.length,
+    left: c.balance == null ? null : Math.max(0, c.balance - enUsed - dcvUsed), noCredit: !!(dcvX.noCredit || c.noCredit) };
+}
 const AI_TIER = s => s >= 9 ? 30 : s >= 7 ? 15 : s >= 5 ? 5 : 0;
 const AI_SYS = `Bạn là cô giáo dạy Tiếng Việt tiểu học ở Việt Nam. Bạn chấm đoạn văn của học sinh lớp 4–5 đang ôn thi vào lớp 6 (sách Kết nối tri thức với cuộc sống).
 
@@ -191,13 +223,19 @@ async function aiGrade(de, yc, text, nc) {
   }
   const mod = require('@anthropic-ai/sdk'), Anthropic = mod.Anthropic || mod.default || mod;
   const client = new Anthropic({ timeout: 55000, maxRetries: 1 });
-  const r = await client.beta.messages.create({
+  let r;
+  try { r = await client.beta.messages.create({
     model: AI_MODEL, max_tokens: 8000,
     betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',
     output_config: { effort: 'medium', format: { type: 'json_schema', schema: AI_SCHEMA } },
     system: AI_SYS,
     messages: [{ role: 'user', content: `<muc>${nc ? 'Nâng cao' : 'Cơ bản'}</muc>\n<de>${de}</de>\n<yeu_cau>${yc}</yeu_cau>\n<bai_lam>\n${text}\n</bai_lam>` }]
-  });
+  }); } catch (e) {
+    if (/credit balance/i.test(String(e && e.message))) { await aiLog(null, true).catch(() => {}); bad('Cô Chấm AI đang tạm nghỉ (hết tiền chấm AI). Em báo bố mẹ hoặc thầy cô nhé.', 503); }
+    bad('Cô Chấm AI đang bận, em thử lại sau ít phút nhé.', 502);
+  }
+  const u = r.usage || {};
+  await aiLog({ in: (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0), out: u.output_tokens || 0 }, false).catch(() => {});
   if (r.stop_reason === 'refusal') bad('Cô Chấm AI chưa chấm được bài này. Em thử nộp lại nhé.', 502);
   const t = (r.content || []).find(b => b.type === 'text');
   let j; try { j = JSON.parse(t ? t.text : ''); } catch (e) { bad('Cô Chấm AI trả lời chưa đúng mẫu. Em thử lại nhé.', 502); }
@@ -375,7 +413,7 @@ async function handle(req, res) {
     if (me.role === 'parent') { const kids = new Set(me.kids); students = students.filter(s => kids.has(s.code) && s.active); }
     const rows = new Map((await progAll()).map(r => [r.code, r]));
     const list = students.sort((x, y) => (x.created || 0) - (y.created || 0)).map(s => report(s, rows.get(s.code), me.role === 'admin'));
-    return out({ me, students: list });
+    return out({ me, students: list, aicredit: me.role === 'admin' ? await aiCredit().catch(() => null) : null });
   }
   if (a === 'comment') {
     const me = need(await who(req), ['teacher', 'admin']);

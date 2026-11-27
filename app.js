@@ -113,7 +113,7 @@ function renderTotal(){
   // tổng sao gộp Cơ bản + Nâng cao (khớp với báo cáo)
   const ids=[...GAMES.map(g=>g.id),...NCG().map(g=>g.id)],t=ids.reduce((a,id)=>a+(best[id]||0),0);
   document.getElementById('total').innerHTML=(me?`<span class="who">${esc(isStudent()?me.name+' · '+me.code:me.name)}</span>`:'')+
-    (isStaff()?`<a class="who-link" href="#theo-doi">${me.role==='parent'?'Báo cáo của con':'Bảng theo dõi'}</a>`:`<svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg>${t}/${ids.length*3}<a class="xu-link" href="#qua" title="Kệ quà">${COIN}<b>${Math.max(0,(xu.total||0)+(jarOn()?0:((G&&G.xu)||0)))}</b> xu</a>${isStudent()&&!xu.wrote?`<a class="jar-pill" href="#thi-thu" title="Viết 1 đoạn văn để mở hũ">🔒 Hũ hôm nay: <b>${Math.max(0,(xu.jar||0)+(jarOn()?((G&&G.xu)||0):0))}</b> xu</a>`:''}`);
+    (isStaff()?`<a class="who-link" href="#theo-doi">${me.role==='parent'?'Báo cáo của con':'Bảng theo dõi'}</a>${aiPill()}`:`<svg viewBox="0 0 24 24" aria-hidden="true">${STAR}</svg>${t}/${ids.length*3}<a class="xu-link" href="#qua" title="Kệ quà">${COIN}<b>${Math.max(0,(xu.total||0)+(jarOn()?0:((G&&G.xu)||0)))}</b> xu</a>${isStudent()&&!xu.wrote?`<a class="jar-pill" href="#thi-thu" title="Viết 1 đoạn văn để mở hũ">🔒 Hũ hôm nay: <b>${Math.max(0,(xu.jar||0)+(jarOn()?((G&&G.xu)||0):0))}</b> xu</a>`:''}`);
 }
 
 let G=null;
@@ -755,6 +755,26 @@ BUILD['doc-hieu']=()=>{
 /* ---------- Bảng theo dõi: thầy cô, Admin, phụ huynh ---------- */
 let DASH=null,TAB='hs';
 const ENG_APP='https://english-exam-web-roan.vercel.app';
+// ---------- Tiền chấm AI (admin): số dư gốc nhập ở app tiếng Anh, trừ chi phí AI của cả hai app
+const usd=(n,d=2)=>'$'+(n||0).toFixed(d).replace('.',',');
+const aiLevel=c=>!c||!c.on?'':c.noCredit?'bad':c.left!=null&&c.left<c.warn?'low':'';
+function aiPill(){if(!me||me.role!=='admin')return '';const c=DASH&&DASH.aicredit;if(!c||!c.on)return '';const l=aiLevel(c);return `<button class="aip ${l}" data-act="d-ai" title="Tiền chấm AI (dùng chung với app tiếng Anh)">🤖 AI ${c.noCredit?'$0':c.left==null?'?':usd(c.left)}</button>`}
+function aiBanner(){const c=DASH&&DASH.aicredit,l=aiLevel(c);if(!l)return '';
+  return l==='bad'?'<div class="aiban bad">⛔ Hết tiền chấm AI: Cô Chấm AI đang tạm dừng (gợi ý dàn bài vẫn dùng được). Nạp thêm ở console.anthropic.com rồi nhập số dư mới ở app tiếng Anh.</div>'
+  :`<div class="aiban low">⚠️ Tiền chấm AI sắp hết: còn ${usd(c.left)} (khoảng ${Math.floor(c.left/c.per)} bài Đảo Câu Văn). Nạp thêm ở console.anthropic.com rồi nhập số dư mới ở app tiếng Anh.</div>`}
+function aiCard(){const c=DASH&&DASH.aicredit;if(!c)return '';
+  if(!c.on)return '<div class="board aic" id="aic"><h3>🤖 Tiền chấm AI</h3><p class="fine">Cô Chấm AI chưa bật: chưa có khóa ANTHROPIC_API_KEY trên Vercel.</p></div>';
+  const l=aiLevel(c),d=c.at?new Date(c.at).toLocaleDateString('vi-VN'):'',vnd=n=>'≈ '+(Math.round(n*25000/10)*10).toLocaleString('vi-VN')+'đ';
+  return `<div class="board aic" id="aic"><h3>🤖 Tiền chấm AI · dùng chung 2 app</h3>
+  ${c.left==null?`<p>Chưa có số dư gốc. Nhập số dư đang hiện ở console.anthropic.com → Billing trong <a href="${ENG_APP}" target="_blank" rel="noopener">app tiếng Anh</a> (Admin → AI credit).</p>`
+  :`<p class="aibig ${l}">${c.noCredit?'$0,00':usd(c.left)} <small>≈ ${c.noCredit?0:Math.floor(c.left/c.per)} bài nữa</small></p>
+  <div class="aicalc"><span>Số dư gốc (nhập ở app tiếng Anh ngày ${d})</span><b>${usd(c.balance)}</b>
+  <span>− App tiếng Anh đã dùng từ hôm đó · ${c.enTests} bài</span><b>−${usd(c.enUsed)}</b>
+  <span>− Đảo Câu Văn đã dùng từ hôm đó · ${c.dcvTests} bài</span><b>−${usd(c.dcvUsed)}</b>
+  <span class="sum">Còn lại (ước tính)</span><b class="sum ${l}">${usd(c.left)}</b></div>`}
+  <div class="aig"><div>Mỗi bài Đảo Câu Văn<b>${usd(c.per,3)}</b>${vnd(c.per)}</div><div>Mỗi bài tiếng Anh<b>${usd(c.enPer,3)}</b>${vnd(c.enPer)}</div><div>Đảo Câu Văn tháng này<b>${usd(c.month)}</b>${c.monthTests} bài</div><div>Cảnh báo khi dưới<b>${usd(c.warn)}</b>đặt ở app tiếng Anh</div></div>
+  <p><a class="ghost sm" href="${ENG_APP}" target="_blank" rel="noopener">Nạp thêm? Nhập số dư mới ở app tiếng Anh ↗</a></p>
+  <p class="fine">Số dư gốc và mức cảnh báo chỉ nhập ở app tiếng Anh, Đảo Câu Văn chỉ đọc. Hai app cùng trừ chi phí của nhau nên hiện cùng một số. Đây là ước tính theo số token, thỉnh thoảng nhập lại số dư thật trên console cho khớp.</p></div>`}
 const islPct=b=>ISLANDS.map((_,k)=>{const gs=GAMES.filter(g=>g.is===k);return {k,got:gs.reduce((a,g)=>a+((b||{})[g.id]||0),0),max:gs.length*3}});
 // tổng sao gộp Cơ bản + Nâng cao của mỗi đảo (báo cáo học sinh)
 const islPctAll=b=>ISLANDS.map((_,k)=>{const ids=GAMES.filter(g=>g.is===k).flatMap(g=>bank(g.id+'-nc').length?[g.id,g.id+'-nc']:[g.id]);return {k,got:ids.reduce((a,id)=>a+((b||{})[id]||0),0),max:ids.length*3}});
@@ -763,7 +783,7 @@ const shortIsl=k=>ISLANDS[k].name.replace('Đảo ','');
 async function renderDash(h){
   G=null;
   if(!isStaff()){$app.innerHTML=`<div class="board"><p>Trang này dành cho thầy cô, phụ huynh và Admin. Hãy đăng nhập ở trang chủ.</p><div class="actions"><a class="primary" href="#">Về trang chủ</a></div></div>`;return}
-  if(!DASH){$app.innerHTML='<p class="fine">Đang tải bảng theo dõi…</p>';try{DASH=await call('dash')}catch(e){$app.innerHTML=`<div class="board"><p>${esc(e.message)}</p></div>`;return}}
+  if(!DASH){$app.innerHTML='<p class="fine">Đang tải bảng theo dõi…</p>';try{DASH=await call('dash');renderTotal()}catch(e){$app.innerHTML=`<div class="board"><p>${esc(e.message)}</p></div>`;return}}
   const S=DASH.students;
   if(h.startsWith('hs-')){const st=S.find(s=>s.code===h.slice(3));if(st)return renderKid(st,{back:me.role!=='parent'||S.length>1,canComment:me.role!=='parent',canGift:true});h='theo-doi'}
   if(me.role==='parent'){if(S.length===1)return renderKid(S[0],{back:false,canComment:false,canGift:true});return listParent(S)}
@@ -773,7 +793,7 @@ async function renderDash(h){
   if(TAB==='ql'&&me.role!=='admin')TAB='hs';
   const body=TAB==='hs'?tableStudents(S):TAB==='bai'?essayFeed(S):TAB==='qua'?giftFeed(S):adminPanel(S);
   $app.innerHTML=`<div class="dhead"><h1>Bảng theo dõi</h1><span class="fine">${esc(me.name)} · ${ROLE_VI[me.role]}</span><button class="ghost sm" data-act="d-refresh">Tải lại</button></div>
-    <div class="tabs" role="tablist">${tabs.map(([k,t])=>`<button class="tab${TAB===k?' on':''}" role="tab" aria-selected="${TAB===k}" data-act="d-tab" data-k="${k}">${t}</button>`).join('')}</div>${body}`;
+    ${me.role==='admin'?aiBanner():''}<div class="tabs" role="tablist">${tabs.map(([k,t])=>`<button class="tab${TAB===k?' on':''}" role="tab" aria-selected="${TAB===k}" data-act="d-tab" data-k="${k}">${t}</button>`).join('')}</div>${body}`;
 }
 // tổng câu đã làm đúng (ngay lần đầu) của mức Cơ bản (nc=false) hoặc Nâng cao (nc=true), không tính thi thử
 function lvSum(x,nc){const sv=((x&&x.stats)||{}).solved||{},gs=nc?NCG().filter(g=>g.base!=='thi-thu'):GAMEB();
@@ -800,7 +820,7 @@ function essayCard(s,e,canComment){
     :(e.comment?`<div class="msg info"><b>${esc(e.commentBy||'Thầy cô')}:</b><span>${esc(e.comment)}</span></div>`:'<p class="fine">Thầy cô chưa nhận xét bài này.</p>')}</div>`;
 }
 function adminPanel(S){
-  return `<div class="board"><p>Thêm, khóa hay xóa học sinh, tài khoản thầy cô và phụ huynh: làm trong <a href="${ENG_APP}" target="_blank" rel="noopener">app tiếng Anh</a>. Thay đổi bên đó có hiệu lực ngay ở đây.</p>
+  return aiCard()+`<div class="board"><p>Thêm, khóa hay xóa học sinh, tài khoản thầy cô và phụ huynh: làm trong <a href="${ENG_APP}" target="_blank" rel="noopener">app tiếng Anh</a>. Thay đổi bên đó có hiệu lực ngay ở đây.</p>
     <div class="tablewrap"><table class="dt"><thead><tr><th>Học sinh</th><th>Link riêng cho phụ huynh</th><th>Dữ liệu trò chơi</th></tr></thead><tbody>
     ${S.map(s=>`<tr><td><b>${esc(s.name)}</b><br><span class="fine">${esc(s.code)}${s.active?'':' · đang khóa'}</span></td>
       <td>${s.plink?`<button class="ghost sm" data-act="d-copy" data-link="${esc(location.origin+location.pathname+'?p='+s.plink)}">Sao chép link</button>`:'<span class="fine">Chưa có. Tạo link phụ huynh trong app tiếng Anh.</span>'}</td>
@@ -936,6 +956,7 @@ async function renderPlink(token){
   catch(e){$app.innerHTML=`<div class="board"><p>${esc(e.message)}</p><div class="actions"><a class="primary" href="/">Về trang trò chơi</a></div></div>`}
 }
 async function dashAct(a,b){
+  if(a==='d-ai'){TAB='ql';if(location.hash!=='#theo-doi')location.hash='theo-doi';else renderDash('theo-doi');setTimeout(()=>{const c=document.getElementById('aic');if(c)c.scrollIntoView({block:'start'})},300);return}
   if(a==='d-tab'){TAB=b.dataset.k;renderDash('theo-doi')}
   else if(a==='d-refresh'){DASH=null;renderDash(location.hash.slice(1)||'theo-doi')}
   else if(a==='d-open'){location.hash='hs-'+b.dataset.code}
