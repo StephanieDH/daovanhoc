@@ -102,16 +102,17 @@ const goalLeft = x => 3 - (x.gdone && x.gdone.day === vnDay() ? x.gdone.n : 0);
 const xuOut = x => { x = x || {}; return { total: x.total || 0, jar: jarValue(x), wrote: wroteToday(x), goal: x.goal || null, goalLeft: goalLeft(x), peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()),
   stats: { solved: x.solved || {}, tried: x.tried || {}, maxStreak: x.maxStreak || 0, perfect: x.perfect || 0, bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
 // Thưởng xu khi mở khóa huy hiệu (mỗi huy hiệu một lần). Danh sách huy hiệu do trình duyệt tính; máy chủ giữ mức thưởng.
-const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 200, write2s: 300, write3s: 400, writeN5: 600, writeN10: 800, writeN20: 1200, king: 1000, legend: 3000 };
+const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 200, write2s: 300, write3s: 400, writeN5: 600, writeN10: 800, writeN20: 1200, king: 1000, legend: 2000 };
 // hệ số xu theo đảo: 0 Mở rộng câu ×1; 1 Câu ghép, 2 Tu từ, 3 Từ ngữ ×½; 4 Viết đoạn (gồm thi thử) ×2
 const ISL_MUL = [1, 0.5, 0.5, 0.5, 2];
 const gameIsl = g => { g = String(g).replace(/-nc$/, ''); if (g === 'thi-thu') return 4; const k = ISL_GAMES.findIndex(a => a.includes(g)); return k < 0 ? 0 : k; };
 function badgeReward(id) {
   let m = /^([a-z-]+)-nc-(dong|bac|vang)$/.exec(id);
-  if (m && GAME_BASE.includes(m[1]) && m[1] !== "thi-thu") return { dong: 250, bac: 300, vang: 400 }[m[2]] * ISL_MUL[gameIsl(m[1])];
+  if (m && GAME_BASE.includes(m[1]) && m[1] !== "thi-thu") return { dong: 200, bac: 250, vang: 300 }[m[2]] * ISL_MUL[gameIsl(m[1])];
   m = /^([a-z-]+)-(dong|bac|vang)$/.exec(id);
-  if (m && GAME_IDS.includes(m[1]) && m[1] !== "thi-thu") return { dong: 50, bac: 100, vang: 200 }[m[2]] * ISL_MUL[gameIsl(m[1])];
-  m = /^isl([0-4])-([12])$/.exec(id); if (m) return (m[2] === "1" ? 150 : 300) * ISL_MUL[+m[1]];
+  if (m && GAME_IDS.includes(m[1]) && m[1] !== "thi-thu") return { dong: 50, bac: 100, vang: 150 }[m[2]] * ISL_MUL[gameIsl(m[1])];
+  // huy hiệu đảo 9 bậc, thưởng tăng đều 100: isl k-1/3/2 = Đồng/Bạc/Vàng (100/200/300), nisl k-1/3/2 = Titan/Platinum/Emerald (400/500/600)
+  m = /^isl([0-4])-([123])$/.exec(id); if (m) return ({ 1: 100, 3: 200, 2: 300 })[m[2]] * ISL_MUL[+m[1]];
   m = /^nisl([0-4])-([123])$/.exec(id); if (m) return ({ 1: 400, 3: 500, 2: 600 })[m[2]] * ISL_MUL[+m[1]];
   return BADGE_FIXED[id] || 0;
 }
@@ -129,7 +130,7 @@ function earned(id, p) {
   const deN = f => new Set(E.filter(f).map(e => e.de)).size;  // số đề khác nhau
   const tierOk = (g, tier) => BANK_ROWS[g] > 0 && (sv[g] || []).length >= Math.ceil(BANK_ROWS[g] * { dong: 0.4, bac: 0.7, vang: 1 }[tier]);
   let m = /^([a-z-]+)-(dong|bac|vang)$/.exec(id); if (m) return tierOk(m[1], m[2]);
-  m = /^isl([0-4])-([12])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g, m[2] === "1" ? "dong" : "vang"));
+  m = /^isl([0-4])-([123])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g, ({ 1: "dong", 3: "bac", 2: "vang" })[m[2]]));
   m = /^nisl([0-4])-([123])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g + "-nc", ({ 1: "dong", 3: "bac", 2: "vang" })[m[2]]));
   switch (id) {
     case "streak10": return (x.maxStreak || 0) >= 10; case "streak20": return (x.maxStreak || 0) >= 20; case "streak30": return (x.maxStreak || 0) >= 30;
