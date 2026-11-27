@@ -913,6 +913,21 @@ const TIER_ART={
  'nisl-2':'<path d="M20 14 H44 V26 C44 34 39 38 32 38 C25 38 20 34 20 26 Z" fill="#EF9F27"/><path d="M20 18 H13 C13 26 16 29 21 30 M44 18 H51 C51 26 48 29 43 30" stroke="#FAC775" stroke-width="3" fill="none"/><rect x="29" y="38" width="6" height="7" fill="#BA7517"/><rect x="21" y="45" width="22" height="6" rx="2" fill="#FAC775"/><path d="M32 18 L34 23 L39 23 L35 26 L36.5 31 L32 28 L27.5 31 L29 26 L25 23 L30 23 Z" fill="#FAEEDA"/>',
  king:'<circle cx="32" cy="32" r="22" fill="none" stroke="#85B7EB" stroke-width="1.5" stroke-dasharray="3 3"/><ellipse cx="32" cy="11" rx="7" ry="4" fill="#378ADD"/><ellipse cx="52" cy="25" rx="7" ry="4" fill="#639922"/><ellipse cx="45" cy="49" rx="7" ry="4" fill="#7F77DD"/><ellipse cx="19" cy="49" rx="7" ry="4" fill="#EF9F27"/><ellipse cx="12" cy="25" rx="7" ry="4" fill="#D4537E"/><path d="M32 20 L35.5 28.5 L44.5 28.5 L37.5 34 L40 43 L32 37.5 L24 43 L26.5 34 L19.5 28.5 L28.5 28.5 Z" fill="#FAC775" stroke="#EF9F27" stroke-width="1.5" stroke-linejoin="round"/>',
  legend:'<path d="M8 30 C16 22 22 24 26 30 C22 30 16 32 12 38 Z M56 30 C48 22 42 24 38 30 C42 30 48 32 52 38 Z" fill="#AFA9EC"/><path d="M32 12 L37 25 L51 25 L40 33 L44 47 L32 39 L20 47 L24 33 L13 25 L27 25 Z" fill="#FAC775" stroke="#EF9F27" stroke-width="2" stroke-linejoin="round"/>'};
+const FLAME_ART=(a,b)=>`<path d="M32 54 C20 54 15 45 17 36 C19 29 25 26 26 18 C31 23 32 28 31 33 C35 30 38 25 38 20 C46 27 49 36 47 43 C45 50 39 54 32 54 Z" fill="${a}"/><path d="M32 54 C26 54 23 49 25 44 C27 40 30 38 31 34 C35 38 39 42 38 47 C37 51 35 54 32 54 Z" fill="${b}"/>`;
+const CAL=(c1,c2,c3,n,fs)=>`<rect x="15" y="17" width="34" height="32" rx="5" fill="${c1}"/><rect x="15" y="17" width="34" height="9" rx="4" fill="${c2}"/><rect x="22" y="13" width="4" height="8" rx="2" fill="${c3}"/><rect x="38" y="13" width="4" height="8" rx="2" fill="${c3}"/><text x="32" y="44" font-size="${fs}" font-weight="700" fill="${c3}" text-anchor="middle" font-family="sans-serif">${n}</text>`;
+const OTHER_ICO={
+ streak10:['#4A1B0C','<path d="M32 46 C24 46 21 40 23 34 C24 30 27 28 28 24 C31 28 31 31 30 34 C33 32 35 29 35 26 C40 30 42 36 40 40 C38 44 35 46 32 46 Z" fill="#EF9F27"/><path d="M32 46 C29 46 27 43 28 40 C29 38 31 37 32 35 C34 38 36 40 35 43 C34 45 33 46 32 46 Z" fill="#FAC775"/>'],
+ streak20:['#4A1B0C',FLAME_ART('#D85A30','#EF9F27')],
+ streak30:['#26215C',FLAME_ART('#7F77DD','#85B7EB')+'<path d="M48 12 L49.5 16 L53.5 17.5 L49.5 19 L48 23 L46.5 19 L42.5 17.5 L46.5 16 Z" fill="#FAC775"/>'],
+ perfect5:['#04342C','<circle cx="30" cy="34" r="17" fill="#E1F5EE"/><circle cx="30" cy="34" r="11" fill="#E24B4A"/><circle cx="30" cy="34" r="5" fill="#E1F5EE"/><path d="M30 34 L50 14" stroke="#412402" stroke-width="3" stroke-linecap="round"/><path d="M46 12 L52 12 L52 18" stroke="#1D9E75" stroke-width="3" fill="none" stroke-linecap="round"/>'],
+ days7:['#042C53',CAL('#E6F1FB','#378ADD','#0C447C',7,15)],
+ days30:['#412402',CAL('#FAEEDA','#EF9F27','#854F0B',30,14)],
+ write5:['#4B1528','<rect x="20" y="12" width="24" height="40" rx="5" fill="#2C2C2A"/><rect x="23" y="17" width="18" height="28" rx="2" fill="#F4C0D1"/><path d="M29 25 L37 31 L29 37 Z" fill="#D4537E"/><circle cx="32" cy="48" r="1.8" fill="#888780"/>'],
+ write2s:['#4B1528','<rect x="15" y="14" width="26" height="36" rx="3" fill="#FBEAF0"/><path d="M20 22 H36 M20 28 H36 M20 34 H30" stroke="#993556" stroke-width="2.5" stroke-linecap="round"/><path d="M46 52 C39 52 37 47 38 43 C39 40 42 38 42 34 C45 37 45 39 44.5 41 C46.5 40 47.5 38 47.5 36 C51 39 52 43 51 46 C50 50 48 52 46 52 Z" fill="#D85A30"/>'],
+ write3s:['#4B1528','<path d="M32 46 C20 38 16 32 16 26 C16 21 20 18 24 18 C28 18 30 20 32 23 C34 20 36 18 40 18 C44 18 48 21 48 26 C48 32 44 38 32 46 Z" fill="#E24B4A"/><path d="M50 10 L52 14 M56 18 L52 18 M12 14 L15 17 M10 22 L14 22 M54 30 L50 29" stroke="#FAC775" stroke-width="2.5" stroke-linecap="round"/><path d="M26 50 L32 56 L38 50" stroke="#F4C0D1" stroke-width="3" fill="none" stroke-linecap="round"/>'],
+ writeN5:['#26215C','<path d="M44 10 L54 20 L28 46 L18 36 Z" fill="#7F77DD"/><path d="M44 10 L54 20 L50 24 L40 14 Z" fill="#AFA9EC"/><path d="M18 36 L28 46 L14 52 Z" fill="#FAC775"/><path d="M14 52 L19 47" stroke="#412402" stroke-width="2"/><path d="M30 18 L32 22 M24 24 L28 25" stroke="#FAC775" stroke-width="2" stroke-linecap="round"/>'],
+ writeN10:['#26215C','<rect x="17" y="14" width="30" height="38" rx="3" fill="#7F77DD"/><rect x="17" y="14" width="5" height="38" fill="#534AB7"/><rect x="22" y="46" width="25" height="4" fill="#EEEDFE"/><path d="M34.5 20 L37 26 L43 26.5 L38.5 30.5 L40 36.5 L34.5 33 L29 36.5 L30.5 30.5 L26 26.5 L32 26 Z" fill="#FAC775"/><path d="M27 41 H42" stroke="#CECBF6" stroke-width="2" stroke-linecap="round"/>'],
+ writeN20:['#042C53','<path d="M32 8 L37 13 L44 12 L45 19 L51 23 L48 29 L51 35 L45 39 L44 46 L37 45 L32 50 L27 45 L20 46 L19 39 L13 35 L16 29 L13 23 L19 19 L20 12 L27 13 Z" fill="#378ADD"/><path d="M23 29 L30 36 L42 22" stroke="#FFFFFF" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M40 50 L52 38 L56 42 L44 54 Z" fill="#FAC775"/>']};
 const svgIco=(bg,art,cls)=>`<svg class="${cls}" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="${bg}"/>${art}</svg>`;
 const islIco=(k,cls='isl-ico')=>svgIco(ISL_BG[k],ISL_ART[k],cls);
 // icon riêng cho huy hiệu đảo và tối thượng; các huy hiệu khác giữ huy chương / ổ khóa
@@ -920,6 +935,7 @@ function badgeIco(b){const m=/^(n?isl)(\d)-(\d)$/.exec(b.id);
   if(m)return svgIco(ISL_DK[+m[2]],TIER_ART[m[1]+'-'+m[3]],'bico');
   if(b.id==='king')return svgIco('#0C447C',TIER_ART.king,'bico');
   if(b.id==='legend')return svgIco('#26215C',TIER_ART.legend,'bico');
+  if(OTHER_ICO[b.id])return svgIco(OTHER_ICO[b.id][0],OTHER_ICO[b.id][1],'bico');
   return '';}
 const MEDAL='<svg class="medal-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h8l-2.5 6h-3z"/><circle cx="12" cy="15" r="6"/></svg>';
 const LOCK='<svg class="medal-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
@@ -937,27 +953,27 @@ function badgeList(x,ess){
   ISLANDS.forEach((isl,k)=>{const gs=GAMEB().filter(g=>g.is===k),has=id=>gs.filter(g=>(out.find(b=>b.id===g.id+id)||{}).ok).length,short=isl.name.replace('Đảo ','');
     [['isl'+k+'-1','dong','Nhà thám hiểm '+isl.name,'-dong','Đồng'],['isl'+k+'-2','vang','Chúa đảo '+short,'-vang','Vàng'],
      ['nisl'+k+'-1','titan','Chiến thần '+isl.name,'-nc-dong','Titan'],['nisl'+k+'-3','ruby','Out trình '+isl.name,'-nc-bac','Ruby'],['nisl'+k+'-2','kc','Trùm cuối '+isl.name,'-nc-vang','Diamond']]
-    .forEach(([id,tier,name,suf,tn])=>{if(suf.startsWith('-nc')&&!bank(gs[0].id+'-nc').length)return;const hv=has(suf);out.push({id,grp:'Đảo',tier,isl:k,name,how:`${tn} ở cả ${gs.length} trò của ${isl.name}.`,have:hv,need:gs.length,ok:hv===gs.length})})});
-  const ms=st.maxStreak||0;[[10,'Ngọn lửa nhỏ'],[20,'Ngọn lửa lớn'],[30,'Ngọn lửa bất diệt']].forEach(([n,name],i)=>out.push({id:'streak'+n,grp:'Chuỗi đúng',tier:TIERS[i][0],name,how:`Đúng liên tiếp ${n} câu trong một lượt chơi.`,have:Math.min(ms,n),need:n,ok:ms>=n}));
-  out.push({id:'perfect5',grp:'Hoàn hảo',tier:'vang',name:'Không một lỗi',how:'Có 5 lượt chơi đúng hết ngay lần đầu.',have:Math.min(st.perfect||0,5),need:5,ok:(st.perfect||0)>=5});
-  const bd=st.bestDays||0;[[7,'Chăm học 7 ngày','bac'],[30,'Chăm học 30 ngày','vang']].forEach(([n,name,tier])=>out.push({id:'days'+n,grp:'Chăm chỉ',tier,name,how:`Chơi liên tục ${n} ngày.`,have:Math.min(bd,n),need:n,ok:bd>=n}));
+    .forEach(([id,tier,name,suf,tn])=>{if(suf.startsWith('-nc')&&!bank(gs[0].id+'-nc').length)return;const hv=has(suf);out.push({id,grp:'Đảo',tier,isl:k,name,short:name.split(' Đảo')[0].replace(/ (Mở rộng câu|Câu ghép|Tu từ|Từ ngữ|Viết đoạn)$/,''),hs:`${tn} ở cả ${gs.length} trò`,how:`${tn} ở cả ${gs.length} trò của ${isl.name}.`,have:hv,need:gs.length,ok:hv===gs.length})})});
+  const ms=st.maxStreak||0;[[10,'Ngọn lửa nhỏ'],[20,'Ngọn lửa lớn'],[30,'Ngọn lửa bất diệt']].forEach(([n,name],i)=>out.push({id:'streak'+n,grp:'Chuỗi đúng',tier:TIERS[i][0],name,hs:`Chuỗi ${n} câu đúng`,how:`Đúng liên tiếp ${n} câu trong một lượt chơi.`,have:Math.min(ms,n),need:n,ok:ms>=n}));
+  out.push({id:'perfect5',grp:'Hoàn hảo',tier:'vang',name:'Không một lỗi',hs:'5 lượt đúng hết',how:'Có 5 lượt chơi đúng hết ngay lần đầu.',have:Math.min(st.perfect||0,5),need:5,ok:(st.perfect||0)>=5});
+  const bd=st.bestDays||0;[[7,'Chăm học 7 ngày','bac'],[30,'Chăm học 30 ngày','vang']].forEach(([n,name,tier])=>out.push({id:'days'+n,grp:'Chăm chỉ',tier,name,hs:`Chơi liên tục ${n} ngày`,how:`Chơi liên tục ${n} ngày.`,have:Math.min(bd,n),need:n,ok:bd>=n}));
   // chuỗi Viết văn: đếm số đề khác nhau (nộp lại cùng một đề chỉ tính một lần)
   const de=f=>new Set(E.filter(f).map(e=>e.de)).size,sub=de(()=>true),s2=de(e=>(e.stars||0)>=2),full=de(e=>e.stars===3),nc3=de(e=>e.nc&&e.stars===3);
-  [['write5','dong','Content creator nhí','Nộp bài cho 5 đề thi thử khác nhau.',sub,5],
-   ['write2s','bac','Bài viết hot','Có 10 đề thi thử đạt từ 2 sao trở lên.',s2,10],
-   ['write3s','vang','Bài viết viral','Có 10 đề thi thử đạt đủ yêu cầu (3 sao).',full,10],
-   ['writeN5','titan','Bút Pro Max','Có 10 đề thi thử Nâng cao đạt 3 sao.',nc3,10],
-   ['writeN10','ruby','Idol viết văn','Có 20 đề thi thử Nâng cao đạt 3 sao.',nc3,20],
-   ['writeN20','kc','KOL văn chương','Có 35 đề thi thử Nâng cao đạt 3 sao.',nc3,35]]
-  .forEach(([id,tier,name,how,have,need])=>out.push({id,grp:'Viết văn',tier,name,how,have:Math.min(have,need),need,ok:have>=need}));
+  [['write5','dong','Content creator nhí','Nộp bài cho 5 đề thi thử khác nhau.',sub,5,'Nộp 5 đề khác nhau'],
+   ['write2s','bac','Bài viết hot','Có 10 đề thi thử đạt từ 2 sao trở lên.',s2,10,'10 đề từ 2 sao'],
+   ['write3s','vang','Bài viết viral','Có 10 đề thi thử đạt đủ yêu cầu (3 sao).',full,10,'10 đề đạt 3 sao'],
+   ['writeN5','titan','Bút Pro Max','Có 10 đề thi thử Nâng cao đạt 3 sao.',nc3,10,'10 đề Nâng cao 3 sao'],
+   ['writeN10','ruby','Idol viết văn','Có 20 đề thi thử Nâng cao đạt 3 sao.',nc3,20,'20 đề Nâng cao 3 sao'],
+   ['writeN20','kc','KOL văn chương','Có 35 đề thi thử Nâng cao đạt 3 sao.',nc3,35,'35 đề Nâng cao 3 sao']]
+  .forEach(([id,tier,name,how,have,need,hs])=>out.push({id,grp:'Viết văn',tier,name,how,hs,have:Math.min(have,need),need,ok:have>=need}));
   const kings=out.filter(b=>/^isl\d-2$/.test(b.id)&&b.ok).length;
-  out.push({id:'king',grp:'Tối thượng',tier:'vang',name:'Vua Đảo Câu Văn',how:'Có đủ 5 huy hiệu Chúa đảo.',have:kings,need:5,ok:kings>=5});
+  out.push({id:'king',grp:'Tối thượng',tier:'vang',name:'Vua Đảo Câu Văn',hs:'Đủ 5 huy hiệu Chúa đảo',how:'Có đủ 5 huy hiệu Chúa đảo.',have:kings,need:5,ok:kings>=5});
   const legends=out.filter(b=>/^nisl\d-2$/.test(b.id)&&b.ok).length;
-  out.push({id:'legend',grp:'Tối thượng',tier:'kc',name:'Huyền thoại Đảo Câu Văn',how:'Có đủ 5 huy hiệu Trùm cuối (Diamond ở mọi trò).',have:legends,need:5,ok:legends>=5});
+  out.push({id:'legend',grp:'Tối thượng',tier:'kc',name:'Huyền thoại Đảo Câu Văn',hs:'Đủ 5 huy hiệu Trùm cuối',how:'Có đủ 5 huy hiệu Trùm cuối (Diamond ở mọi trò).',have:legends,need:5,ok:legends>=5});
   return out;
 }
 function BREWARD(id){let m=/^([a-z-]+)-nc-(dong|bac|vang)$/.exec(id);if(m)return {dong:250,bac:300,vang:400}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^nisl(\d)-([123])$/.exec(id);if(m)return {1:400,3:500,2:600}[m[2]]*ISL_MUL[+m[1]];m=/^([a-z-]+)-(dong|bac|vang)$/.exec(id);if(m)return {dong:50,bac:100,vang:200}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^isl(\d)-([12])$/.exec(id);if(m)return (m[2]==='1'?150:300)*ISL_MUL[+m[1]];return {streak10:100,streak20:200,streak30:300,perfect5:200,days7:150,days30:300,write5:200,write2s:300,write3s:400,writeN5:600,writeN10:800,writeN20:1200,king:1000,legend:3000}[id]||0}
-function badgeHtml(b,paid){const n=BREWARD(b.id);return `<div class="bdg ${b.ok?'on':'off'} t-${b.tier}"><span class="medal">${badgeIco(b)||(b.ok?MEDAL:LOCK)}</span><b>${esc(b.name)}</b><span class="fine">${esc(b.how)}</span><div class="bfoot"><div class="meter sm${b.ok?' full':''}"><div style="width:${b.ok?100:Math.round(b.have/b.need*100)}%"></div></div>${b.ok?'<span class="fine got">✓ Đã mở khóa</span>':`<span class="fine">${b.have}/${b.need}</span>`}<span class="rw">${b.ok?((paid||[]).includes(b.id)?`Đã nhận ${vn(n)} xu`:`Sẽ nhận ${vn(n)} xu sau lượt chơi tới`):`Thưởng ${vn(n)} xu`}</span></div></div>`}
+function badgeHtml(b,paid){const n=BREWARD(b.id);return `<div class="bdg ${b.ok?'on':'off'} t-${b.tier}" title="${esc(b.name+': '+b.how)}"><span class="medal">${badgeIco(b)||(b.ok?MEDAL:LOCK)}</span><b>${esc(b.short||b.name)}</b><span class="fine">${esc(b.hs||b.how)}</span><div class="bfoot"><div class="meter sm${b.ok?' full':''}"><div style="width:${b.ok?100:Math.round(b.have/b.need*100)}%"></div></div>${b.ok?'<span class="fine got">✓ Đã mở khóa</span>':`<span class="fine">${b.have}/${b.need}</span>`}<span class="rw">${b.ok?((paid||[]).includes(b.id)?`Đã nhận ${vn(n)} xu`:`Sẽ nhận ${vn(n)} xu sau lượt chơi tới`):`Thưởng ${vn(n)} xu`}</span></div></div>`}
 function gameBadgeCard(g,sv){const n=bank(g.id).length,got=Math.min((sv[g.id]||[]).length,n),nid=g.id+'-nc',nn=bank(nid).length,ng=Math.min((sv[nid]||[]).length,nn);
   const bar=(lbl,a,t)=>`<div class="lvbar"><span>${lbl}</span><div class="meter sm"><div style="width:${t?Math.round(a/t*100):0}%"></div></div><span class="fine">${a}/${t}</span></div>`;
   return `<div class="gbdg c${g.is}"><b>${g.name}</b>${bar('Cơ bản',got,n)}${nn?bar('Nâng cao',ng,nn):''}<span class="pips">${TIERS.map(([k,name,p])=>`<span class="pip t-${k}${got>=Math.ceil(n*p)?' on':''}" title="${name}: ${Math.ceil(n*p)} câu Cơ bản">${name}</span>`).join('')}</span><span class="pips">${nn?NTIERS.map(([k,name,p,t])=>`<span class="pip t-${t}${ng>=Math.ceil(nn*p)?' on':''}" title="${name}: ${Math.ceil(nn*p)} câu Nâng cao">${name}</span>`).join(''):''}</span></div>`}
