@@ -104,7 +104,7 @@ const goalLeft = x => 3 - (x.gdone && x.gdone.day === vnDay() ? x.gdone.n : 0);
 const xuOut = x => { x = x || {}; return { total: x.total || 0, jar: jarValue(x), wrote: wroteToday(x), goal: x.goal || null, goalLeft: goalLeft(x), peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()),
   stats: { solved: x.solved || {}, tried: x.tried || {}, maxStreak: x.maxStreak || 0, perfect: x.perfect || 0, bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
 // Thưởng xu khi mở khóa huy hiệu (mỗi huy hiệu một lần). Danh sách huy hiệu do trình duyệt tính; máy chủ giữ mức thưởng.
-const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, days7: 150, days30: 300, write5: 200, write2s: 300, write3s: 400, writeN5: 600, writeN10: 800, writeN20: 1200, king: 1000, legend: 2000, god: 3000, writeL10: 1500, writeL20: 2000, writeL35: 3000 };
+const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, perfect10: 250, perfect20: 300, perfect35: 350, perfect50: 400, perfect100: 450, days7: 150, days30: 300, write5: 200, write2s: 300, write3s: 400, writeN5: 600, writeN10: 800, writeN20: 1200, king: 1000, legend: 2000, god: 3000, writeL10: 1500, writeL20: 2000, writeL35: 3000 };
 // hệ số xu theo đảo: 0 Mở rộng câu ×1; 1 Câu ghép, 2 Tu từ, 3 Từ ngữ ×½; 4 Viết đoạn (gồm thi thử) ×2
 const ISL_MUL = [1, 0.5, 0.5, 0.5, 2];
 const gameIsl = g => { g = String(g).replace(/-(nc|tt)$/, ''); if (g === 'thi-thu') return 4; const k = ISL_GAMES.findIndex(a => a.includes(g)); return k < 0 ? 0 : k; };
@@ -142,7 +142,8 @@ function earned(id, p) {
   m = /^lisl([0-4])-([123])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g + "-tt", ({ 1: "dong", 3: "bac", 2: "vang" })[m[2]]));
   switch (id) {
     case "streak10": return (x.maxStreak || 0) >= 10; case "streak20": return (x.maxStreak || 0) >= 20; case "streak30": return (x.maxStreak || 0) >= 30;
-    case "perfect5": return (x.perfect || 0) >= 5; case "days7": return bestRun(x.days) >= 7; case "days30": return bestRun(x.days) >= 30;
+    case "perfect5": return (x.perfect || 0) >= 5; case "perfect10": return (x.perfect || 0) >= 10; case "perfect20": return (x.perfect || 0) >= 20;
+    case "perfect35": return (x.perfect || 0) >= 35; case "perfect50": return (x.perfect || 0) >= 50; case "perfect100": return (x.perfect || 0) >= 100; case "days7": return bestRun(x.days) >= 7; case "days30": return bestRun(x.days) >= 30;
     case "write5": return deN(() => true) >= 5; case "write2s": return deN(e => (e.stars || 0) >= 2) >= 10; case "write3s": return deN(e => e.stars === 3) >= 10;
     case "writeN5": return deN(e => e.nc && e.stars === 3) >= 10; case "writeN10": return deN(e => e.nc && e.stars === 3) >= 20; case "writeN20": return deN(e => e.nc && e.stars === 3) >= 35;
     case "king": return [0, 1, 2, 3, 4].every(k => earned("isl" + k + "-2", p));
