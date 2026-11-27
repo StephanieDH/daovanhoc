@@ -278,7 +278,10 @@ async function sendTL(){
   if(text.length<15){G.tlErr='Em viết thêm rồi hãy nộp nhé.';return render()}
   G.tlWait=true;G.tlErr='';render();
   try{const d=await call('tlgrade',{game:G.g.id,p:T.p,q:T.q,rub:T.rub,text});G.tlRes=d;G.done=true;if(d.score>=2)G.correct++;
-    const done=new Set(LS.get(T.lk,[])||[]);done.add(T.ix);LS.set(T.lk,[...done])}
+    const done=new Set(LS.get(T.lk,[])||[]);
+    // xu tự luận ngắn: 10 xu mỗi điểm (×3 Thử thách, × hệ số đảo), chỉ lần đầu làm câu này, không trừ
+    if(!done.has(T.ix)&&d.score>0)xuAdd(Math.round(d.score*10),`Cô Chấm: ${String(d.score).replace('.',',')}/3 điểm`);
+    done.add(T.ix);LS.set(T.lk,[...done])}
   catch(e){G.tlErr=e.message}
   G.tlWait=false;render();
 }
