@@ -257,10 +257,10 @@ const BLANK='<span class="blank">?</span>';
 function resetQuiz(){G.sel=null;G.tried=[];G.done=false;G.msg=null;G.tlText='';G.tlRes=null;G.tlWait=false;G.tlErr=''}
 function quiz(id,map){G.qs=pickNew(qrows(id).map((r,ix)=>[r,ix]),QUIZ_N,x=>x[1]).map(([r,ix])=>Object.assign(map(r),{key:ix}));resetQuiz()}
 // câu tự luận ngắn mức Thử thách (bảng <trò>-tt-tl): thay câu cuối của lượt, ưu tiên câu chưa làm
-function addTL(id){
+function addTL(id,keep){
   const T=LV==='-tt'?bank(id+'-tt-tl'):[];if(!T.length||!G.qs.length)return;
   const lk='dcv-tl-'+(me&&me.code||'guest')+'-'+id,done=new Set(LS.get(lk,[])||[]),fresh=T.map((r,ix)=>ix).filter(ix=>!done.has(ix)),pool=fresh.length?fresh:T.map((r,ix)=>ix),ix=pool[Math.floor(Math.random()*pool.length)];
-  const [p,src,q,rub,ref]=T[ix].split('|');G.qs=G.qs.slice(0,QUIZ_N-1);G.qs.push({tl:{p,src,q,rub,ref,ix,lk}});
+  const [p,src,q,rub,ref]=T[ix].split('|');if(!keep)G.qs=G.qs.slice(0,QUIZ_N-1);G.qs.push({tl:{p,src,q,rub,ref,ix,lk}});
 }
 function renderTL(q){
   const T=q.tl,R=G.tlRes;
@@ -782,7 +782,7 @@ BUILD['doc-hieu']=()=>{
     qs.push({key:row.ix,intro:`<p class="ask">Đọc kĩ đoạn văn rồi trả lời câu hỏi ${n+1}/${qa.length}.</p>`,col:true,
       options:shuffle([opt(r,true,why),opt(w1,false,READ_MISS),opt(w2,false,READ_MISS)]),
       view:()=>`<div class="poem passage">${esc(p).split('/').join('<br>')}${by?`<div class="by">${esc(by)}</div>`:''}<div class="q">${esc(qt)}</div></div>`})})});
-  G.qs=qs;resetQuiz();
+  G.qs=qs;resetQuiz();addTL('doc-hieu',true);
 };
 
 /* ---------- Bảng theo dõi: thầy cô, Admin, phụ huynh ---------- */
