@@ -458,7 +458,7 @@ async function handle(req, res) {
     if (tries >= 3) bad('Đề này Cô Chấm AI đã chấm 3 lần. Em thử một đề khác nhé.', 429);
     const ai = await aiGrade(de, yc, text, game.endsWith('-tt') ? 'Thử thách' : game.endsWith('-nc') ? 'Nâng cao' : 'Cơ bản');
     const prev = (x.aiBest || {})[de] || 0;
-    const gain = Math.floor(Math.max(0, AI_TIER(ai.score) - AI_TIER(prev)) * (game.endsWith('-nc') ? 2 : 1) * ISL_MUL[gameIsl(game)]);
+    const gain = Math.floor(Math.max(0, AI_TIER(ai.score) - AI_TIER(prev)) * lvMul(game) * ISL_MUL[gameIsl(game)]);
     x.aiBest = { ...(x.aiBest || {}), [de]: Math.max(prev, ai.score) };
     x.aiTry = { ...(x.aiTry || {}), [de]: tries + 1 };
     x.aiDay = { day: today, n: day.n + 1 };
