@@ -168,7 +168,7 @@ function renderMap(){
   $app.innerHTML=`<section class="hero"><h1>Chọn một trò chơi để luyện câu văn</h1>
   <p>Mỗi màu là một hòn đảo kỹ năng. Bé chơi trò nào trước cũng được: làm câu dài hơn, hay hơn, rồi viết thành đoạn văn hoàn chỉnh.</p></section>
   ${acct()}
-  <div class="isl-legend">${ISLANDS.map((isl,k)=>`<span class="isl-tag c${k}"><span class="isle-dot" aria-hidden="true"></span>${isl.name}</span>`).join('')}</div>
+  <div class="isl-legend">${ISLANDS.map((isl,k)=>`<span class="isl-tag c${k}">${islIco(k)}${isl.name}</span>`).join('')}</div>
   <div class="islands">${MIXED.map(card).join('')}</div>
   <p class="note">Ngân hàng có ${total} câu hỏi. Mỗi lượt chơi bốc ngẫu nhiên vài câu, nên mỗi lần chơi sẽ khác nhau.</p>`;
 }
@@ -837,7 +837,7 @@ function renderKid(st,o){
   $app.innerHTML=`${o.back?'<div class="bar"><a class="back" href="#theo-doi">← Bảng theo dõi</a></div>':''}${o.top||''}
     <div class="board"><div class="dhead"><h1>Báo cáo của ${esc(st.name)}</h1><span class="fine">Mã ${esc(st.code)} · chơi gần nhất: ${fmtDate(st.updated)} · <span class="sy">★</span> ${islPctAll(st.best).reduce((a,x)=>a+x.got,0)}/${islPctAll(st.best).reduce((a,x)=>a+x.max,0)} sao</span></div>
       <p class="lvsum">Câu đã làm đúng: <b>Cơ bản ${(q=>`${vn(q.got)}/${vn(q.n)} (${q.p}%)`)(lvSum(st.xu,false))}</b> · <b>Nâng cao ${(q=>`${vn(q.got)}/${vn(q.n)} (${q.p}%)`)(lvSum(st.xu,true))}</b></p>
-      <div class="isl-sum">${islPctAll(st.best).map(x=>`<span class="isl-tag c${x.k}"><span class="isle-dot" aria-hidden="true"></span>${shortIsl(x.k)} <span class="sy" aria-hidden="true">★</span> ${x.got}/${x.max} sao</span>`).join('')}</div>
+      <div class="isl-sum">${islPctAll(st.best).map(x=>`<span class="isl-tag c${x.k}">${islIco(x.k)}${shortIsl(x.k)} <span class="sy" aria-hidden="true">★</span> ${x.got}/${x.max} sao</span>`).join('')}</div>
       ${weak.length?`<div class="msg weak"><b>Cơ bản chưa đạt 2 sao:</b><span>${weak.join(', ')}.</span></div>`:'<div class="msg ok"><b>Cơ bản:</b><span>Bé đã đạt từ 2 sao trở lên ở mọi trò chơi.</span></div>'}<div class="msg ${ncOk===ncAll.length?'ok':'info'}"><b>Nâng cao:</b><span>${ncOk}/${ncAll.length} trò đạt từ 2 sao.</span></div>
       <div class="islands">${MIXED.map(g=>{const sv=((st.xu&&st.xu.stats)||{}).solved||{},nc=bank(g.id+'-nc').length,cnt=id=>g.id==='thi-thu'?'':`<span>${Math.min((sv[id]||[]).length,bank(id).length)}/${bank(id).length}</span>`,st3=starTxt;
         return nc?`<div class="island tinted c${g.is} mini"><span class="card-isl">${ISLANDS[g.is].name}</span><h3>${g.name}</h3><div class="lvrow"><span>Cơ bản ${st3(st.best[g.id])}</span>${cnt(g.id)}</div><div class="lvrow"><span>Nâng cao ${st3(st.best[g.id+'-nc'])}</span>${cnt(g.id+'-nc')}</div></div>`
@@ -897,6 +897,30 @@ async function saveGifts(f){
   catch(e){msg.textContent=e.message}
 }
 /* ---------- Huy hiệu ---------- */
+// ---------- Bộ icon: 5 đảo, 5 bậc huy hiệu đảo, Vua Đảo Câu Văn (quần đảo), Huyền thoại (sao có cánh)
+const ISL_BG=['#E6F1FB','#EAF3DE','#EEEDFE','#FAEEDA','#FBEAF0'],ISL_DK=['#185FA5','#3B6D11','#534AB7','#854F0B','#993556'];
+const ISL_ART=[
+ '<rect x="13" y="18" width="14" height="6" rx="3" fill="#0C447C"/><rect x="13" y="29" width="24" height="6" rx="3" fill="#185FA5"/><rect x="13" y="40" width="34" height="6" rx="3" fill="#378ADD"/><path d="M43 20 L51 20 M47 16 L51 20 L47 24" stroke="#0C447C" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+ '<rect x="9" y="24" width="26" height="16" rx="8" fill="none" stroke="#3B6D11" stroke-width="5"/><rect x="29" y="24" width="26" height="16" rx="8" fill="none" stroke="#639922" stroke-width="5"/>',
+ '<path d="M16 50 L38 28" stroke="#3C3489" stroke-width="6" stroke-linecap="round"/><path d="M38 28 L41 25" stroke="#EF9F27" stroke-width="6" stroke-linecap="round"/><path d="M45 10 L47.5 16.5 L54 19 L47.5 21.5 L45 28 L42.5 21.5 L36 19 L42.5 16.5 Z" fill="#EF9F27"/><circle cx="24" cy="18" r="2.5" fill="#7F77DD"/><circle cx="52" cy="38" r="2" fill="#7F77DD"/>',
+ '<path d="M32 20 C26 15 17 15 11 17 L11 47 C17 45 26 45 32 50 Z" fill="#FAC775"/><path d="M32 20 C38 15 47 15 53 17 L53 47 C47 45 38 45 32 50 Z" fill="#EF9F27"/><path d="M32 20 L32 50" stroke="#854F0B" stroke-width="2"/><text x="21" y="38" font-size="11" font-weight="700" fill="#633806" text-anchor="middle" font-family="sans-serif">Aa</text>',
+ '<rect x="12" y="12" width="30" height="40" rx="4" fill="#F4C0D1"/><path d="M18 22 H36 M18 29 H36 M18 36 H30" stroke="#993556" stroke-width="2.5" stroke-linecap="round"/><path d="M50 22 L34 46 L31 52 L37 48 L53 24 Z" fill="#D4537E"/><path d="M50 22 L53 24" stroke="#72243E" stroke-width="3"/>'];
+const TIER_ART={
+ 'isl-1':'<circle cx="32" cy="32" r="18" fill="none" stroke="#F1EFE8" stroke-width="4"/><path d="M32 16 L37 32 L32 48 L27 32 Z" fill="#E24B4A"/><path d="M32 32 L37 32 L32 48 L27 32 Z" fill="#D3D1C7"/><circle cx="32" cy="32" r="3" fill="#2C2C2A"/>',
+ 'isl-2':'<path d="M14 44 L12 22 L23 31 L32 16 L41 31 L52 22 L50 44 Z" fill="#EF9F27"/><rect x="14" y="44" width="36" height="6" rx="2" fill="#BA7517"/><circle cx="32" cy="38" r="3" fill="#E24B4A"/><circle cx="22" cy="40" r="2" fill="#1D9E75"/><circle cx="42" cy="40" r="2" fill="#378ADD"/>',
+ 'nisl-1':'<path d="M32 12 L50 18 L50 32 C50 43 42 50 32 54 C22 50 14 43 14 32 L14 18 Z" fill="#888780"/><path d="M32 16 L46 21 L46 32 C46 41 40 46 32 50 Z" fill="#B4B2A9"/><path d="M34 22 L26 34 L32 34 L29 44 L38 31 L32 31 Z" fill="#FAC775"/>',
+ 'nisl-3':'<path d="M32 10 C41 16 44 28 40 42 L24 42 C20 28 23 16 32 10 Z" fill="#E6F1FB"/><circle cx="32" cy="26" r="5" fill="#378ADD"/><path d="M24 34 L16 44 L24 42 Z M40 34 L48 44 L40 42 Z" fill="#E24B4A"/><path d="M27 42 L32 54 L37 42 Z" fill="#EF9F27"/>',
+ 'nisl-2':'<path d="M20 14 H44 V26 C44 34 39 38 32 38 C25 38 20 34 20 26 Z" fill="#EF9F27"/><path d="M20 18 H13 C13 26 16 29 21 30 M44 18 H51 C51 26 48 29 43 30" stroke="#FAC775" stroke-width="3" fill="none"/><rect x="29" y="38" width="6" height="7" fill="#BA7517"/><rect x="21" y="45" width="22" height="6" rx="2" fill="#FAC775"/><path d="M32 18 L34 23 L39 23 L35 26 L36.5 31 L32 28 L27.5 31 L29 26 L25 23 L30 23 Z" fill="#FAEEDA"/>',
+ king:'<circle cx="32" cy="32" r="22" fill="none" stroke="#85B7EB" stroke-width="1.5" stroke-dasharray="3 3"/><ellipse cx="32" cy="11" rx="7" ry="4" fill="#378ADD"/><ellipse cx="52" cy="25" rx="7" ry="4" fill="#639922"/><ellipse cx="45" cy="49" rx="7" ry="4" fill="#7F77DD"/><ellipse cx="19" cy="49" rx="7" ry="4" fill="#EF9F27"/><ellipse cx="12" cy="25" rx="7" ry="4" fill="#D4537E"/><path d="M32 20 L35.5 28.5 L44.5 28.5 L37.5 34 L40 43 L32 37.5 L24 43 L26.5 34 L19.5 28.5 L28.5 28.5 Z" fill="#FAC775" stroke="#EF9F27" stroke-width="1.5" stroke-linejoin="round"/>',
+ legend:'<path d="M8 30 C16 22 22 24 26 30 C22 30 16 32 12 38 Z M56 30 C48 22 42 24 38 30 C42 30 48 32 52 38 Z" fill="#AFA9EC"/><path d="M32 12 L37 25 L51 25 L40 33 L44 47 L32 39 L20 47 L24 33 L13 25 L27 25 Z" fill="#FAC775" stroke="#EF9F27" stroke-width="2" stroke-linejoin="round"/>'};
+const svgIco=(bg,art,cls)=>`<svg class="${cls}" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="${bg}"/>${art}</svg>`;
+const islIco=(k,cls='isl-ico')=>svgIco(ISL_BG[k],ISL_ART[k],cls);
+// icon riêng cho huy hiệu đảo và tối thượng; các huy hiệu khác giữ huy chương / ổ khóa
+function badgeIco(b){const m=/^(n?isl)(\d)-(\d)$/.exec(b.id);
+  if(m)return svgIco(ISL_DK[+m[2]],TIER_ART[m[1]+'-'+m[3]],'bico');
+  if(b.id==='king')return svgIco('#0C447C',TIER_ART.king,'bico');
+  if(b.id==='legend')return svgIco('#26215C',TIER_ART.legend,'bico');
+  return '';}
 const MEDAL='<svg class="medal-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h8l-2.5 6h-3z"/><circle cx="12" cy="15" r="6"/></svg>';
 const LOCK='<svg class="medal-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
 const TIERS=[['dong','Đồng',.4],['bac','Bạc',.7],['vang','Vàng',1]];
@@ -913,7 +937,7 @@ function badgeList(x,ess){
   ISLANDS.forEach((isl,k)=>{const gs=GAMEB().filter(g=>g.is===k),has=id=>gs.filter(g=>(out.find(b=>b.id===g.id+id)||{}).ok).length,short=isl.name.replace('Đảo ','');
     [['isl'+k+'-1','dong','Nhà thám hiểm '+isl.name,'-dong','Đồng'],['isl'+k+'-2','vang','Chúa đảo '+short,'-vang','Vàng'],
      ['nisl'+k+'-1','titan','Chiến thần '+isl.name,'-nc-dong','Titan'],['nisl'+k+'-3','ruby','Out trình '+isl.name,'-nc-bac','Ruby'],['nisl'+k+'-2','kc','Trùm cuối '+isl.name,'-nc-vang','Diamond']]
-    .forEach(([id,tier,name,suf,tn])=>{if(suf.startsWith('-nc')&&!bank(gs[0].id+'-nc').length)return;const hv=has(suf);out.push({id,grp:'Đảo',tier,isl:k,name,how:`Có huy hiệu ${tn} ở cả ${gs.length} trò của ${isl.name}.`,have:hv,need:gs.length,ok:hv===gs.length})})});
+    .forEach(([id,tier,name,suf,tn])=>{if(suf.startsWith('-nc')&&!bank(gs[0].id+'-nc').length)return;const hv=has(suf);out.push({id,grp:'Đảo',tier,isl:k,name,how:`${tn} ở cả ${gs.length} trò của ${isl.name}.`,have:hv,need:gs.length,ok:hv===gs.length})})});
   const ms=st.maxStreak||0;[[10,'Ngọn lửa nhỏ'],[20,'Ngọn lửa lớn'],[30,'Ngọn lửa bất diệt']].forEach(([n,name],i)=>out.push({id:'streak'+n,grp:'Chuỗi đúng',tier:TIERS[i][0],name,how:`Đúng liên tiếp ${n} câu trong một lượt chơi.`,have:Math.min(ms,n),need:n,ok:ms>=n}));
   out.push({id:'perfect5',grp:'Hoàn hảo',tier:'vang',name:'Không một lỗi',how:'Có 5 lượt chơi đúng hết ngay lần đầu.',have:Math.min(st.perfect||0,5),need:5,ok:(st.perfect||0)>=5});
   const bd=st.bestDays||0;[[7,'Chăm học 7 ngày','bac'],[30,'Chăm học 30 ngày','vang']].forEach(([n,name,tier])=>out.push({id:'days'+n,grp:'Chăm chỉ',tier,name,how:`Chơi liên tục ${n} ngày.`,have:Math.min(bd,n),need:n,ok:bd>=n}));
@@ -933,7 +957,7 @@ function badgeList(x,ess){
   return out;
 }
 function BREWARD(id){let m=/^([a-z-]+)-nc-(dong|bac|vang)$/.exec(id);if(m)return {dong:250,bac:300,vang:400}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^nisl(\d)-([123])$/.exec(id);if(m)return {1:400,3:500,2:600}[m[2]]*ISL_MUL[+m[1]];m=/^([a-z-]+)-(dong|bac|vang)$/.exec(id);if(m)return {dong:50,bac:100,vang:200}[m[2]]*ISL_MUL[gameIsl(m[1])];m=/^isl(\d)-([12])$/.exec(id);if(m)return (m[2]==='1'?150:300)*ISL_MUL[+m[1]];return {streak10:100,streak20:200,streak30:300,perfect5:200,days7:150,days30:300,write5:200,write2s:300,write3s:400,writeN5:600,writeN10:800,writeN20:1200,king:1000,legend:3000}[id]||0}
-function badgeHtml(b,paid){const n=BREWARD(b.id);return `<div class="bdg ${b.ok?'on':'off'} t-${b.tier}"><span class="medal">${b.ok?MEDAL:LOCK}</span><b>${esc(b.name)}</b><span class="fine">${esc(b.how)}</span><div class="bfoot"><div class="meter sm${b.ok?' full':''}"><div style="width:${b.ok?100:Math.round(b.have/b.need*100)}%"></div></div>${b.ok?'<span class="fine got">✓ Đã mở khóa</span>':`<span class="fine">${b.have}/${b.need}</span>`}<span class="rw">${b.ok?((paid||[]).includes(b.id)?`Đã nhận ${vn(n)} xu`:`Sẽ nhận ${vn(n)} xu sau lượt chơi tới`):`Thưởng ${vn(n)} xu`}</span></div></div>`}
+function badgeHtml(b,paid){const n=BREWARD(b.id);return `<div class="bdg ${b.ok?'on':'off'} t-${b.tier}"><span class="medal">${badgeIco(b)||(b.ok?MEDAL:LOCK)}</span><b>${esc(b.name)}</b><span class="fine">${esc(b.how)}</span><div class="bfoot"><div class="meter sm${b.ok?' full':''}"><div style="width:${b.ok?100:Math.round(b.have/b.need*100)}%"></div></div>${b.ok?'<span class="fine got">✓ Đã mở khóa</span>':`<span class="fine">${b.have}/${b.need}</span>`}<span class="rw">${b.ok?((paid||[]).includes(b.id)?`Đã nhận ${vn(n)} xu`:`Sẽ nhận ${vn(n)} xu sau lượt chơi tới`):`Thưởng ${vn(n)} xu`}</span></div></div>`}
 function gameBadgeCard(g,sv){const n=bank(g.id).length,got=Math.min((sv[g.id]||[]).length,n),nid=g.id+'-nc',nn=bank(nid).length,ng=Math.min((sv[nid]||[]).length,nn);
   const bar=(lbl,a,t)=>`<div class="lvbar"><span>${lbl}</span><div class="meter sm"><div style="width:${t?Math.round(a/t*100):0}%"></div></div><span class="fine">${a}/${t}</span></div>`;
   return `<div class="gbdg c${g.is}"><b>${g.name}</b>${bar('Cơ bản',got,n)}${nn?bar('Nâng cao',ng,nn):''}<span class="pips">${TIERS.map(([k,name,p])=>`<span class="pip t-${k}${got>=Math.ceil(n*p)?' on':''}" title="${name}: ${Math.ceil(n*p)} câu Cơ bản">${name}</span>`).join('')}</span><span class="pips">${nn?NTIERS.map(([k,name,p,t])=>`<span class="pip t-${t}${ng>=Math.ceil(nn*p)?' on':''}" title="${name}: ${Math.ceil(nn*p)} câu Nâng cao">${name}</span>`).join(''):''}</span></div>`}
@@ -942,7 +966,7 @@ function badgePanel(x,ess){
   return `<p class="bsum">${MEDAL}<b>${L.filter(b=>b.ok).length}</b>/${L.length} huy hiệu</p>
     <h3 class="bgrp">Bộ câu hỏi</h3><p class="fine">Mỗi câu chỉ tính một lần, khi trả lời đúng ngay lần đầu (trò nhiều bước: đúng hết các bước). Đồng / Bạc / Vàng: 40% / 70% / 100% câu Cơ bản của trò; Titan / Ruby / Diamond: 40% / 70% / 100% câu Nâng cao. Thưởng: 50 · 100 · 200 · 250 · 300 · 400 xu, nhân hệ số của đảo (Viết đoạn ×2, Mở rộng câu ×1, Câu ghép, Tu từ, Từ ngữ ×½).</p>
     <div class="gbdgs">${GAMEB().map(g=>gameBadgeCard(g,sv)).join('')}</div>
-    ${[...new Set(L.filter(b=>!b.grp.startsWith('Bộ câu hỏi')).map(b=>b.grp))].map(gp=>`<h3 class="bgrp">${gp}</h3><div class="bdgs">${L.filter(b=>b.grp===gp).map(b=>badgeHtml(b,(x&&x.paid)||[])).join('')}</div>`).join('')}`;
+    ${[...new Set(L.filter(b=>!b.grp.startsWith('Bộ câu hỏi')).map(b=>b.grp))].map(gp=>`<h3 class="bgrp">${gp}</h3>`+(gp==='Đảo'?ISLANDS.map((isl,k)=>{const r=L.filter(b=>b.grp===gp&&b.isl===k);return r.length?`<p class="isl-row c${k}">${islIco(k)}${isl.name}</p><div class="bdgs five">${r.map(b=>badgeHtml(b,(x&&x.paid)||[])).join('')}</div>`:''}).join(''):`<div class="bdgs">${L.filter(b=>b.grp===gp).map(b=>badgeHtml(b,(x&&x.paid)||[])).join('')}</div>`)).join('')}`;
 }
 function renderBadges(){
   G=null;
