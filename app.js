@@ -63,6 +63,8 @@ const lvMul=g=>g&&g.l3?3:g&&g.nc?2:1;
 const STAR='<path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3L2.9 9.5l6.3-.9z"/>';
 function stars(n,big){let h=`<span class="stars${big?' big':''}" role="img" aria-label="${n} trên 3 sao">`;for(let i=0;i<3;i++)h+=`<svg viewBox="0 0 24 24" class="${i<n?'on':''}" aria-hidden="true">${STAR}</svg>`;return h+'</span>'}
 const starsFrom=(c,n)=>c===n?3:c>=Math.ceil(n*.75)?2:c>=1?1:0;
+// sao của trò = độ phủ + độ chính xác (khớp máy chủ): ★ ≥10% câu; ★★ ≥40% và lượt tốt nhất ≥2 sao; ★★★ ≥70% và đã có lượt đúng hết
+function covStars(id,roundSt,extra){const st=(xu&&xu.stats)||{},n=bank(id).length,br=Math.max(((st.bestRound||{})[id])||0,roundSt||0);if(!n||baseId(id)==='thi-thu')return roundSt;const c=new Set([...((st.solved||{})[id]||[]),...(extra||[])]).size/n;return c>=.7&&br>=3?3:c>=.4&&br>=2?2:c>=.1&&br>=1?1:0}
 
 /* ---------- Tài khoản và lưu sao (dùng chung tài khoản với app tiếng Anh) ---------- */
 const LS={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
@@ -99,7 +101,7 @@ async function saveRound(id,s,essay){
   if(isStudent()){
     const before=new Set(badgeList(xu,essays).filter(b=>b.ok).map(b=>b.id));
     const solved=solvedKeys(),perfect=!!(G&&G.seen&&G.seen.size&&!G.anyDirty&&baseId(id)!=='thi-thu');
-    try{const d=await call('save',{game:id,stars:s,essay,xu:delta,solved,tried:G&&G.dirty?[...G.dirty]:[],maxStreak:G?G.maxStreak||0:0,perfect});essays=d.essays||essays;xu=d.xu||xu;renderTotal();if(G&&baseId(G.g.id)==='thi-thu')renderEssays();
+    try{const d=await call('save',{game:id,stars:s,round:G&&G.roundSt!=null?G.roundSt:s,essay,xu:delta,solved,tried:G&&G.dirty?[...G.dirty]:[],maxStreak:G?G.maxStreak||0:0,perfect});essays=d.essays||essays;xu=d.xu||xu;renderTotal();if(G&&baseId(G.g.id)==='thi-thu')renderEssays();
       // thưởng xu cho huy hiệu mới mở (và huy hiệu mở từ trước khi có thưởng), mỗi huy hiệu một lần
       const now=badgeList(xu,essays),fresh=new Set(now.filter(b=>b.ok&&!before.has(b.id)).map(b=>b.id)),bonus=[...(d.bonus||[])];
       const unpaid=now.filter(b=>b.ok&&!(xu.paid||[]).includes(b.id));
@@ -233,16 +235,16 @@ function xuSumHtml(lines,delta,r){
 }
 function renderEnd(){
   if(G.endHtml){$app.innerHTML=G.endHtml;return}
-  const st=starsFrom(G.correct,G.total);
-  // xu sao: chỉ thưởng phần sao vượt kỷ lục cũ của trò này (chơi lại để đạt lại số sao cũ thì không có xu)
-  const gain=Math.max(0,st-(best[G.g.id]||0));
+  const rst=starsFrom(G.correct,G.total),st=isStudent()?covStars(G.g.id,rst,solvedKeys()):rst;G.roundSt=rst;
+  // xu sao: chỉ thưởng sao mới chưa từng được trả (theo luật sao độ phủ + độ chính xác)
+  const gain=Math.max(0,st-Math.max(best[G.g.id]||0,(((xu&&xu.stats&&xu.stats.starPaid)||{})[G.g.id])||0));
   if(gain&&!isStaff())xuAdd(gain*XU.star,`Thêm ${gain} sao mới (kỷ lục ${st} sao)`,true);
   G.ended=true;const lines=groupLines(G.xuLines),delta=G.xu,gid=G.g.id;
   const lst=G.g.l3?L3G():G.g.nc?NCG():GAMES,idx=lst.findIndex(x=>x.id===G.g.id),nx=lst[idx+1];
   $app.innerHTML=bar(G.g)+`<div class="board end">
     <div class="stamp"><span><span class="big">${st}</span>sao</span></div>${stars(st,true)}
     <h2>Hoàn thành “${G.g.name}”!</h2>
-    <p>Bé làm đúng ngay lần đầu ${G.correct}/${G.total} lần.${st<3?' Chơi lại để lấy đủ 3 sao nhé.':''}</p>
+    <p>Bé làm đúng ngay lần đầu ${G.correct}/${G.total} lần (lượt này ${rst} sao).${isStudent()&&baseId(G.g.id)!=='thi-thu'?` Sao của trò tính theo số câu đã làm đúng: ${Math.round(Math.min(1,new Set([...((((xu&&xu.stats)||{}).solved||{})[G.g.id]||[]),...solvedKeys()]).size/Math.max(1,bank(G.g.id).length))*100)}% (★ 10% · ★★ 40% · ★★★ 70% và có lượt đúng hết).`:st<3?' Chơi lại để lấy đủ 3 sao nhé.':''}</p>
     ${isStaff()?'':`<div class="xu-sum" id="xusum">${xuSumHtml(lines,delta,null)}</div>`}
     <div class="actions" style="justify-content:center"><button class="ghost" data-act="again">Chơi lượt mới</button>${nx?`<a class="primary" href="#${nx.id}">Chơi tiếp: ${nx.name}</a>`:'<a class="primary" href="#">Về bản đồ</a>'}</div></div>`;
   const g0=G;saveRound(gid,st).then(r=>{const el=document.getElementById('xusum');if(el)el.innerHTML=xuSumHtml(lines,delta,r);if(G===g0)G.endHtml=$app.innerHTML});

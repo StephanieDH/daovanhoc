@@ -33,8 +33,29 @@ async function sb(path, opt = {}) {
 const enc = encodeURIComponent;
 async function kvGet(col, id) { const r = await sb(`kv?collection=eq.${enc(col)}&id=eq.${enc(id)}&select=data`); return r && r[0] ? r[0].data : null; }
 async function kvList(col) { return ((await sb(`kv?collection=eq.${enc(col)}&select=data&order=id`)) || []).map(r => r.data); }
-async function prog(code) { const r = await sb(`${T}?code=eq.${enc(code)}&select=code,best,essays,xu,updated_at`); return r && r[0] ? r[0] : { code, best: {}, essays: [], xu: {}, updated_at: null }; }
-async function progAll() { return (await sb(`${T}?select=code,best,essays,xu,updated_at`)) || []; }
+// Sao của mỗi trò (từ 27/11/2026) = độ phủ + độ chính xác, không còn là kỷ lục một lượt:
+//   ★ đã làm đúng ≥10% câu của trò; ★★ ≥40% và lượt tốt nhất ≥2 sao; ★★★ ≥70% và đã có lượt đúng hết.
+// x.bestRound[trò] = số sao của lượt tốt nhất; x.starPaid[trò] = số sao cao nhất đã trả xu (không trả lại).
+// Phòng thi thử giữ cách cũ (sao theo yêu cầu của đề).
+function covStars(x, game, extra) {
+  const n = BANK_ROWS[game] || 0, br = ((x.bestRound || {})[game]) || 0;
+  if (!n) return br;
+  const s = new Set([...(((x.solved || {})[game]) || []), ...(extra || [])]), c = s.size / n;
+  return c >= 0.7 && br >= 3 ? 3 : c >= 0.4 && br >= 2 ? 2 : c >= 0.1 && br >= 1 ? 1 : 0;
+}
+// dọn một lần: sao cũ (kỷ lục lượt) chuyển thành bestRound + starPaid, rồi tính lại sao theo luật mới
+function normStars(p) {
+  if (!p) return p;
+  const x = { ...(p.xu || {}) };
+  if (x.starV) return p;
+  const old = { ...(p.best || {}) };
+  x.bestRound = { ...old, ...(x.bestRound || {}) }; x.starPaid = { ...old, ...(x.starPaid || {}) }; x.starV = 2;
+  const best = { ...old };
+  for (const g of Object.keys(best)) if (!isThi(g)) best[g] = covStars(x, g);
+  p.best = best; p.xu = x; return p;
+}
+async function prog(code) { const r = await sb(`${T}?code=eq.${enc(code)}&select=code,best,essays,xu,updated_at`); return normStars(r && r[0] ? r[0] : { code, best: {}, essays: [], xu: {}, updated_at: null }); }
+async function progAll() { return ((await sb(`${T}?select=code,best,essays,xu,updated_at`)) || []).map(normStars); }
 async function progPut(p) {
   await sb(T, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ code: p.code, best: p.best || {}, essays: p.essays || [], xu: p.xu || {}, updated_at: new Date().toISOString() }) });
@@ -102,7 +123,7 @@ const essaySentences = t => String(t || '').split(/[.!?…]+/).filter(z => z.tri
 function addXu(x, n) { if (wroteToday(x)) { x.total = Math.max(0, (x.total || 0) + n); x.peak = Math.max(x.peak || 0, x.total); } else { const d = vnDay(); x.jar = { ...(x.jar || {}) }; x.jar[d] = Math.max(0, (x.jar[d] || 0) + n); } }
 const goalLeft = x => 3 - (x.gdone && x.gdone.day === vnDay() ? x.gdone.n : 0);
 const xuOut = x => { x = x || {}; return { total: x.total || 0, jar: jarValue(x), wrote: wroteToday(x), goal: x.goal || null, goalLeft: goalLeft(x), peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()),
-  stats: { solved: x.solved || {}, tried: x.tried || {}, maxStreak: x.maxStreak || 0, perfect: pfCount(x), bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
+  stats: { solved: x.solved || {}, tried: x.tried || {}, maxStreak: x.maxStreak || 0, perfect: pfCount(x), bestRound: x.bestRound || {}, starPaid: x.starPaid || {}, bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
 // Thưởng xu khi mở khóa huy hiệu (mỗi huy hiệu một lần). Danh sách huy hiệu do trình duyệt tính; máy chủ giữ mức thưởng.
 // số lượt hoàn hảo hợp lệ: dữ liệu cũ (chưa dọn) tính tối đa 5
 const pfCount = x => x.perfectV ? (x.perfect || 0) : Math.min(5, x.perfect || 0);
@@ -336,10 +357,18 @@ async function handle(req, res) {
   }
   if (a === 'save') {
     const me = need(await who(req), ['student']);
-    const game = String(body.game || ''), stars = Math.max(0, Math.min(3, parseInt(body.stars, 10) || 0));
+    const game = String(body.game || ''), roundStars = Math.max(0, Math.min(3, parseInt(body.round ?? body.stars, 10) || 0));
     if (!GAME_IDS.includes(game)) bad('Trò chơi không đúng.');
     const p = await prog(me.code);
     const prevStars = (p.best || {})[game] || 0;
+    let stars = roundStars;
+    if (!isThi(game)) {
+      const x0 = { ...(p.xu || {}) };
+      x0.bestRound = { ...(x0.bestRound || {}), [game]: Math.max(((x0.bestRound || {})[game]) || 0, roundStars) };
+      const add = (Array.isArray(body.solved) ? body.solved : []).map(n => parseInt(n, 10)).filter(n => n >= 0 && n < (BANK_ROWS[game] || 0));
+      stars = covStars(x0, game, add); p.xu = x0;
+    }
+    const paidStars = Math.max(prevStars, (((p.xu || {}).starPaid || {})[game]) || 0);
     p.best = { ...(p.best || {}) }; if (!(p.best[game] >= stars)) p.best[game] = stars;
     // xu: phần cộng/trừ trong lượt chơi do trình duyệt gửi lên (giới hạn hợp lí), thưởng thêm do máy chủ tính
     ensureGoal(p);
@@ -360,7 +389,7 @@ async function handle(req, res) {
         x.goal = { game: goalPick({ ...p, xu: x }, game) };
       }
     }
-    if (stars === 3 && prevStars < 3) bonus.push(["Lần đầu đạt 3 sao ở trò này", Math.floor(50 * lvMul(game) * ISL_MUL[gameIsl(game)])]);
+    if (stars === 3 && paidStars < 3) bonus.push(["Lần đầu đạt 3 sao ở trò này", Math.floor(50 * lvMul(game) * ISL_MUL[gameIsl(game)])]);
     const today = vnDay(); x.days = Array.isArray(x.days) ? x.days : [];
     if (!x.days.includes(today)) {
       bonus.push(["Chơi hôm nay", 15]); x.days = [...x.days, today].slice(-60);
@@ -389,6 +418,7 @@ async function handle(req, res) {
     if (tr.length && !isThi(game)) { x.tried = { ...(x.tried || {}) }; x.tried[game] = [...new Set([...(x.tried[game] || []), ...tr])].slice(-1000); }
     x.maxStreak = Math.max(x.maxStreak || 0, Math.min(200, parseInt(body.maxStreak, 10) || 0));
     if (body.perfect === true && !isThi(game) && sv.length >= 2 && freshN * 2 >= sv.length) x.perfect = (x.perfect || 0) + 1;
+    if (!isThi(game)) x.starPaid = { ...(x.starPaid || {}), [game]: Math.max(paidStars, stars) };
     p.xu = x; p.bonus = bonus;
     p.essays = Array.isArray(p.essays) ? p.essays : [];
     if (isThi(game) && body.essay && body.essay.text) {
