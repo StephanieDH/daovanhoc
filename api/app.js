@@ -103,7 +103,7 @@ function bestRun(days) { const s = [...new Set(days || [])].sort(); let best = 0
 const GOAL_FAV = ['xep-doan', 'doc-hieu', 'thi-thu', 'cam-thu'];
 function goalPick(p, exclude) {
   const x = p.xu || {}, sv = x.solved || {}, E = Array.isArray(p.essays) ? p.essays : [];
-  const thi = lv => new Set(E.filter(e => (e.tt ? 'tt' : e.nc ? 'nc' : '') === lv).map(e => e.de)).size / 50;
+  const thi = lv => new Set(E.filter(e => (e.tt ? 'tt' : e.nc ? 'nc' : '') === lv).map(e => e.de)).size / (lv === 'tt' ? 40 : 50);
   const ids = GAME_IDS.filter(g => (isThi(g) || BANK_ROWS[g] > 0) && g !== exclude);
   const r = ids.map(g => [g, isThi(g) ? thi(g.endsWith('-nc') ? 'nc' : g.endsWith('-tt') ? 'tt' : '') : (sv[g] || []).length / BANK_ROWS[g]]).filter(a => a[1] < 1)
     .map(([g, v]) => [g, v - (GOAL_FAV.includes(g.replace(/-(nc|tt)$/, '')) ? 0.3 : 0)]);
