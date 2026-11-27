@@ -102,8 +102,10 @@ const essaySentences = t => String(t || '').split(/[.!?…]+/).filter(z => z.tri
 function addXu(x, n) { if (wroteToday(x)) { x.total = Math.max(0, (x.total || 0) + n); x.peak = Math.max(x.peak || 0, x.total); } else { const d = vnDay(); x.jar = { ...(x.jar || {}) }; x.jar[d] = Math.max(0, (x.jar[d] || 0) + n); } }
 const goalLeft = x => 3 - (x.gdone && x.gdone.day === vnDay() ? x.gdone.n : 0);
 const xuOut = x => { x = x || {}; return { total: x.total || 0, jar: jarValue(x), wrote: wroteToday(x), goal: x.goal || null, goalLeft: goalLeft(x), peak: x.peak || 0, gifts: giftsOf(x), req: (x.req || []).slice(-50), streak: dayStreak(x.days || [], vnDay()),
-  stats: { solved: x.solved || {}, tried: x.tried || {}, maxStreak: x.maxStreak || 0, perfect: x.perfect || 0, bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
+  stats: { solved: x.solved || {}, tried: x.tried || {}, maxStreak: x.maxStreak || 0, perfect: pfCount(x), bestDays: bestRun(x.days) }, paid: x.paid || [] }; };
 // Thưởng xu khi mở khóa huy hiệu (mỗi huy hiệu một lần). Danh sách huy hiệu do trình duyệt tính; máy chủ giữ mức thưởng.
+// số lượt hoàn hảo hợp lệ: dữ liệu cũ (chưa dọn) tính tối đa 5
+const pfCount = x => x.perfectV ? (x.perfect || 0) : Math.min(5, x.perfect || 0);
 const BADGE_FIXED = { streak10: 100, streak20: 200, streak30: 300, perfect5: 200, perfect10: 250, perfect20: 300, perfect35: 350, perfect50: 400, perfect100: 450, days7: 150, days30: 300, write5: 200, write2s: 300, write3s: 400, writeN5: 600, writeN10: 800, writeN20: 1200, king: 1000, legend: 2000, god: 3000, writeL10: 1500, writeL20: 2000, writeL35: 3000 };
 // hệ số xu theo đảo: 0 Mở rộng câu ×1; 1 Câu ghép, 2 Tu từ, 3 Từ ngữ ×½; 4 Viết đoạn (gồm thi thử) ×2
 const ISL_MUL = [1, 0.5, 0.5, 0.5, 2];
@@ -142,8 +144,8 @@ function earned(id, p) {
   m = /^lisl([0-4])-([123])$/.exec(id); if (m) return ISL_GAMES[+m[1]].every(g => tierOk(g + "-tt", ({ 1: "dong", 3: "bac", 2: "vang" })[m[2]]));
   switch (id) {
     case "streak10": return (x.maxStreak || 0) >= 10; case "streak20": return (x.maxStreak || 0) >= 20; case "streak30": return (x.maxStreak || 0) >= 30;
-    case "perfect5": return (x.perfect || 0) >= 5; case "perfect10": return (x.perfect || 0) >= 10; case "perfect20": return (x.perfect || 0) >= 20;
-    case "perfect35": return (x.perfect || 0) >= 35; case "perfect50": return (x.perfect || 0) >= 50; case "perfect100": return (x.perfect || 0) >= 100; case "days7": return bestRun(x.days) >= 7; case "days30": return bestRun(x.days) >= 30;
+    case "perfect5": return pfCount(x) >= 5; case "perfect10": return pfCount(x) >= 10; case "perfect20": return pfCount(x) >= 20;
+    case "perfect35": return pfCount(x) >= 35; case "perfect50": return pfCount(x) >= 50; case "perfect100": return pfCount(x) >= 100; case "days7": return bestRun(x.days) >= 7; case "days30": return bestRun(x.days) >= 30;
     case "write5": return deN(() => true) >= 5; case "write2s": return deN(e => (e.stars || 0) >= 2) >= 10; case "write3s": return deN(e => e.stars === 3) >= 10;
     case "writeN5": return deN(e => e.nc && e.stars === 3) >= 10; case "writeN10": return deN(e => e.nc && e.stars === 3) >= 20; case "writeN20": return deN(e => e.nc && e.stars === 3) >= 35;
     case "king": return [0, 1, 2, 3, 4].every(k => earned("isl" + k + "-2", p));
@@ -377,12 +379,16 @@ async function handle(req, res) {
     p.jarOpened = jarOpened;
     // thống kê cho huy hiệu: các câu (số thứ tự trong ngân hàng) đã trả lời đúng ngay lần đầu, chuỗi dài nhất, số lượt hoàn hảo
     const sv = (Array.isArray(body.solved) ? body.solved : []).map(n => parseInt(n, 10)).filter(n => n >= 0 && n < (BANK_ROWS[game] || 0)).slice(0, 50);
+    // dọn dữ liệu một lần (27/11/2026): số lượt hoàn hảo cũ bị đếm cả lượt chơi lại câu cũ, hạ xuống tối đa 5 (giữ Mắt tinh)
+    if (!x.perfectV) { x.perfect = Math.min(5, x.perfect || 0); x.perfectV = 2; }
+    // lượt hoàn hảo chỉ tính khi ít nhất một nửa số câu là câu mới (chưa từng làm đúng): chơi lại câu cũ không tính
+    const solvedBefore = new Set(((x.solved || {})[game]) || []), freshN = sv.filter(n => !solvedBefore.has(n)).length;
     if (sv.length && !isThi(game)) { x.solved = { ...(x.solved || {}) }; x.solved[game] = [...new Set([...(x.solved[game] || []), ...sv])].sort((a, b) => a - b); }
     // câu đã từng trả lời sai (để lượt sau ưu tiên ôn lại)
     const tr = (Array.isArray(body.tried) ? body.tried : []).map(n => parseInt(n, 10)).filter(n => n >= 0 && n < (BANK_ROWS[game] || 0)).slice(0, 50);
     if (tr.length && !isThi(game)) { x.tried = { ...(x.tried || {}) }; x.tried[game] = [...new Set([...(x.tried[game] || []), ...tr])].slice(-1000); }
     x.maxStreak = Math.max(x.maxStreak || 0, Math.min(200, parseInt(body.maxStreak, 10) || 0));
-    if (body.perfect === true && !isThi(game)) x.perfect = (x.perfect || 0) + 1;
+    if (body.perfect === true && !isThi(game) && sv.length >= 2 && freshN * 2 >= sv.length) x.perfect = (x.perfect || 0) + 1;
     p.xu = x; p.bonus = bonus;
     p.essays = Array.isArray(p.essays) ? p.essays : [];
     if (isThi(game) && body.essay && body.essay.text) {
