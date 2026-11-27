@@ -150,7 +150,7 @@ const BANK_ROWS = { "cay-cau": 50, "tau-chu": 50, "tham-tu": 50, "dau-cau": 51, 
 // Số dòng ngân hàng mức Nâng cao (data/nc-*.js) — chạy lại script khi thêm câu
 const BANK_ROWS_NC = {"cam-thu-nc":104,"cap-tu-nc":101,"cau-noi-nc":100,"cay-cau-nc":105,"chinh-ta-nc":101,"dau-cau-nc":100,"doc-hieu-nc":35,"ghep-cau-nc":101,"kinh-lup-nc":104,"nhan-hoa-nc":100,"nhieu-nghia-nc":100,"noi-doi-nc":25,"phan-loai-nc":104,"so-sanh-nc":102,"sua-cau-nc":100,"tau-chu-nc":101,"tham-tu-nc":100,"thanh-ngu-nc":104,"thi-thu-nc":50,"tu-lay-nc":114,"xep-doan-nc":100};
 // Số dòng ngân hàng Thử thách (data/tt-*.js) — chạy lại script khi thêm câu
-const BANK_ROWS_TT = { "cam-thu-tt": 70, "so-sanh-tt": 100, "nhan-hoa-tt": 100, "doc-hieu-tt": 34 };
+const BANK_ROWS_TT = { "cam-thu-tt": 70, "so-sanh-tt": 100, "nhan-hoa-tt": 100, "doc-hieu-tt": 34, "xep-doan-tt": 100 };
 Object.assign(BANK_ROWS, BANK_ROWS_NC, BANK_ROWS_TT);
 const ISL_GAMES = [["cay-cau", "tau-chu", "tham-tu", "dau-cau"], ["ghep-cau", "cau-noi", "sua-cau"], ["so-sanh", "nhan-hoa", "cam-thu"],
   ["noi-doi", "kinh-lup", "tu-lay", "thanh-ngu", "phan-loai", "nhieu-nghia", "cap-tu", "chinh-ta"], ["xep-doan", "doc-hieu"]];
